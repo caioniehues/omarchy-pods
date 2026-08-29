@@ -103,6 +103,10 @@ BleManager::BleManager(QObject *parent) : QObject(parent)
             this, &BleManager::onScanFinished);
     connect(discoveryAgent, &QBluetoothDeviceDiscoveryAgent::errorOccurred,
             this, &BleManager::onErrorOccurred);
+
+    retryTimer = new QTimer(this);
+    retryTimer->setSingleShot(true);
+    connect(retryTimer, &QTimer::timeout, this, &BleManager::retryScan);
 }
 
 BleManager::~BleManager()
@@ -120,6 +124,8 @@ void BleManager::startScan()
     duty.request();
     // A start inside the gap has to disarm the pending resume, or the next tick starts a second window.
     idleTimer->stop();
+    retryTimer->stop();
+    noteScanAlive();
     discoveryAgent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
 }
 
@@ -128,16 +134,40 @@ void BleManager::stopScan()
     LOG_DEBUG("Stopping BLE scan...");
     duty.cancel();
     idleTimer->stop();
+    retryTimer->stop();
+    retryLadder.reset();
     discoveryAgent->stop();
 }
 
+// Reports the caller intent, not the radio state, so a scan that waits for a retry still counts as wanted.
 bool BleManager::isScanning() const
 {
     return duty.isRequested();
 }
 
+// Keeps the count that startScan clears, so an adapter that stays down gets a longer delay each time.
+void BleManager::retryScan()
+{
+    if (!duty.isRequested())
+    {
+        return;
+    }
+
+    LOG_DEBUG("Retrying BLE scan, attempt" << retryLadder.attempts());
+    discoveryAgent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+}
+
+void BleManager::noteScanAlive()
+{
+    retryLadder.reset();
+    lastScanError = QBluetoothDeviceDiscoveryAgent::NoError;
+}
+
 void BleManager::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
+    // An advertisement proves the radio scans again, so the next failure starts the delay at one second.
+    noteScanAlive();
+
     // Check for Apple's manufacturer ID (0x004C)
     if (info.manufacturerData().contains(0x004C))
     {
@@ -253,8 +283,28 @@ void BleManager::onIdleFinished()
     discoveryAgent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
 }
 
+// A cold start can begin before the adapter has power, and each connect and disconnect starts the scan again.
+// One failure must not stop discovery for the life of the process.
 void BleManager::onErrorOccurred(QBluetoothDeviceDiscoveryAgent::Error error)
 {
-    LOG_ERROR("BLE scan error occurred:" << error);
-    stopScan();
+    discoveryAgent->stop();
+
+    if (!duty.isRequested())
+    {
+        LOG_ERROR("BLE scan error occurred:" << error);
+        return;
+    }
+
+    const int delay = retryLadder.nextDelayMs();
+    // The retry repeats the scan, so only a new error is worth a log line.
+    if (error != lastScanError)
+    {
+        LOG_ERROR("BLE scan error occurred:" << error << ", retrying in" << delay << "ms");
+        lastScanError = error;
+    }
+    else
+    {
+        LOG_DEBUG("BLE scan error repeated:" << error << ", retrying in" << delay << "ms");
+    }
+    retryTimer->start(delay);
 }

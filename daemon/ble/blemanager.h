@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QString>
 #include <QDateTime>
+#include "blescanretry.hpp"
 #include "enums.h"
 #include "scanduty.hpp"
 
@@ -80,11 +81,14 @@ private slots:
     void onScanFinished();
     void onIdleFinished();
     void onErrorOccurred(QBluetoothDeviceDiscoveryAgent::Error error);
+    void retryScan();
 
 signals:
     void deviceFound(const BleInfo &device);
 
 private:
+    void noteScanAlive();
+
     // Default-init so a partial construction (or a refactor that
     // skips the explicit ctor body) doesn't leave a dangling pointer
     // that start/stop/isScan would dereference. Real assignment
@@ -92,6 +96,9 @@ private:
     QBluetoothDeviceDiscoveryAgent *discoveryAgent = nullptr;
     QTimer *idleTimer = nullptr;
     ScanDuty::Cycle duty;
+    QTimer *retryTimer = nullptr;
+    BleScanRetry::Ladder retryLadder;
+    QBluetoothDeviceDiscoveryAgent::Error lastScanError = QBluetoothDeviceDiscoveryAgent::NoError;
 };
 
 #endif // BLEMANAGER_H
