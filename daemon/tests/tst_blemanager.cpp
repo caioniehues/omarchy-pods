@@ -2,6 +2,7 @@
 #include <QBluetoothAddress>
 #include <QBluetoothDeviceDiscoveryAgent>
 #include <QBluetoothDeviceInfo>
+#include <QBluetoothLocalDevice>
 #include <QTimer>
 
 #include "../ble/blemanager.h"
@@ -80,6 +81,14 @@ static void seeAdvertisement(BleManager &manager)
                                     advertisement(QByteArray::fromHex(airPodsFrameHex))));
 }
 
+// HostConnectable is the mode BlueZ reports after the adapter has power again.
+static void powerAdapterOn(BleManager &manager)
+{
+    QMetaObject::invokeMethod(&manager, "onHostModeChanged", Qt::DirectConnection,
+                              Q_ARG(QBluetoothLocalDevice::HostMode,
+                                    QBluetoothLocalDevice::HostConnectable));
+}
+
 // The duty cycle's idle timer is a second QTimer child, so look the retry timer up by name.
 static QTimer *retryTimerOf(BleManager &manager)
 {
@@ -99,6 +108,7 @@ private slots:
     void scanErrorArmsARetryAndKeepsTheIntent();
     void advertisementResetsTheRetryLadder();
     void stoppedScanIsNotRestartedByAFailure();
+    void adapterPowerOnRestartsAWantedScan();
 };
 
 void TestBleManager::unparseableFrameIsDropped_data()
@@ -223,6 +233,27 @@ void TestBleManager::stoppedScanIsNotRestartedByAFailure()
 
     failScan(manager);
     QVERIFY(!retry->isActive());
+    QVERIFY(!manager.isScanning());
+}
+
+// The adapter drops a live scan with no signal, so the power state must start it again.
+void TestBleManager::adapterPowerOnRestartsAWantedScan()
+{
+    BleManager manager;
+    QTimer *retry = retryTimerOf(manager);
+    QVERIFY(retry);
+
+    manager.startScan();
+    seeAdvertisement(manager);
+    failScan(manager);
+    QVERIFY(retry->isActive());
+
+    powerAdapterOn(manager);
+    QVERIFY(manager.isScanning());
+    QVERIFY(!retry->isActive());
+
+    manager.stopScan();
+    powerAdapterOn(manager);
     QVERIFY(!manager.isScanning());
 }
 

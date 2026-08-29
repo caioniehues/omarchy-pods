@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QBluetoothDeviceDiscoveryAgent>
+#include <QBluetoothLocalDevice>
 #include <QMap>
 #include <QString>
 #include <QDateTime>
@@ -81,6 +82,7 @@ private slots:
     void onScanFinished();
     void onIdleFinished();
     void onErrorOccurred(QBluetoothDeviceDiscoveryAgent::Error error);
+    void onHostModeChanged(QBluetoothLocalDevice::HostMode mode);
     void retryScan();
 
 signals:
@@ -97,6 +99,7 @@ private:
     QTimer *idleTimer = nullptr;
     ScanDuty::Cycle duty;
     QTimer *retryTimer = nullptr;
+    QBluetoothLocalDevice *localDevice = nullptr;
     BleScanRetry::Ladder retryLadder;
     QBluetoothDeviceDiscoveryAgent::Error lastScanError = QBluetoothDeviceDiscoveryAgent::NoError;
 };

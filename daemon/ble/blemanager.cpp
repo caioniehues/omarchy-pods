@@ -108,6 +108,10 @@ BleManager::BleManager(QObject *parent) : QObject(parent)
     retryTimer->setObjectName(QStringLiteral("bleScanRetry"));
     retryTimer->setSingleShot(true);
     connect(retryTimer, &QTimer::timeout, this, &BleManager::retryScan);
+
+    localDevice = new QBluetoothLocalDevice(this);
+    connect(localDevice, &QBluetoothLocalDevice::hostModeStateChanged,
+            this, &BleManager::onHostModeChanged);
 }
 
 BleManager::~BleManager()
@@ -156,6 +160,21 @@ void BleManager::retryScan()
 
     LOG_DEBUG("Retrying BLE scan, attempt" << retryLadder.attempts());
     discoveryAgent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+}
+
+// The agent gets no signal when the adapter drops a live scan, and it still reports that scan as active.
+// The host mode change is the only event left, so use it to start the scan again.
+void BleManager::onHostModeChanged(QBluetoothLocalDevice::HostMode mode)
+{
+    if (mode == QBluetoothLocalDevice::HostPoweredOff || !duty.isRequested())
+    {
+        return;
+    }
+
+    LOG_INFO("Bluetooth adapter powered on, restarting the BLE scan");
+    // Call stop() first, because start() does nothing while the agent still reports an active scan.
+    discoveryAgent->stop();
+    startScan();
 }
 
 void BleManager::noteScanAlive()
