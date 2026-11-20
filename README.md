@@ -142,8 +142,8 @@ The daemon also takes the AirPods' high-resolution microphone (64 kHz) over the 
 control channel it already uses, so A2DP playback keeps running. It is published as
 one microphone named after the AirPods, and the panel switches it on and off. If
 that stream delivers no audio after two restarts while an app records, the daemon
-falls back to the headset profile for that call, so playback is narrowband in the
-meantime. It returns to A2DP a few seconds after the recorder leaves. The idea comes
+stops retrying until a bud goes in or out of an ear; it never switches the card to a
+headset profile, so playback stays on SBC-XQ throughout. The idea comes
 from upstream librepods, see [PR 655](https://github.com/kavishdevar/librepods/pull/655).
 
 ## Install

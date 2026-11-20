@@ -11,10 +11,8 @@ namespace OpenPods::HiRes
     // No audio for this long while worn means the stream stalled: STOP, then START.
     inline constexpr int kStallMs = 2000;
     inline constexpr int kMaxBackoffMs = 30000;
-    // After this many restarts without audio the headset profile takes over the same source.
+    // After this many restarts without audio the stream waits for an ear change before trying again.
     inline constexpr int kMaxFailedRestarts = 2;
-    // The headset profile costs playback quality, so it is left soon after the recorder.
-    inline constexpr int kFallbackIdleMs = 3000;
     // Apps close and reopen the mic often, and every STOP costs an audible A2DP reset.
     inline constexpr int kRecorderGoneGraceMs = 60000;
     // Adjusting the buds reports both out for a moment, which must not stop or move the mic.
