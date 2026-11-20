@@ -28,12 +28,12 @@ class MainloopWakeup
 {
 public:
     MainloopWakeup(pa_threaded_mainloop *mainloop, int timeoutMs)
-        : m_api(pa_threaded_mainloop_get_api(mainloop))
+        : m_api(pa_threaded_mainloop_get_api(mainloop)), m_mainloop(mainloop)
     {
         struct timeval tv;
         pa_gettimeofday(&tv);
         pa_timeval_add(&tv, static_cast<pa_usec_t>(timeoutMs) * PA_USEC_PER_MSEC);
-        m_event = m_api->time_new(m_api, &tv, &MainloopWakeup::fire, mainloop);
+        m_event = m_api->time_new(m_api, &tv, &MainloopWakeup::fire, this);
     }
 
     // Runs with the mainloop lock held, because every caller unlocks only after the readiness wait returns.
@@ -45,14 +45,20 @@ public:
     MainloopWakeup(const MainloopWakeup &) = delete;
     MainloopWakeup &operator=(const MainloopWakeup &) = delete;
 
+    bool expired() const { return m_expired; }
+
 private:
     static void fire(pa_mainloop_api *, pa_time_event *, const struct timeval *, void *userdata)
     {
-        pa_threaded_mainloop_signal(static_cast<pa_threaded_mainloop*>(userdata), 0);
+        auto *self = static_cast<MainloopWakeup*>(userdata);
+        self->m_expired = true;
+        pa_threaded_mainloop_signal(self->m_mainloop, 0);
     }
 
     pa_mainloop_api *m_api = nullptr;
+    pa_threaded_mainloop *m_mainloop = nullptr;
     pa_time_event *m_event = nullptr;
+    bool m_expired = false;
 };
 
 enum class ContextReadiness { Ready, Failed, TimedOut };
@@ -62,11 +68,11 @@ ContextReadiness waitForContextReady(pa_threaded_mainloop *mainloop, pa_context 
 {
     MainloopWakeup wakeup(mainloop, timeoutMs);
 
-    QElapsedTimer timer; timer.start();
     while (pa_context_get_state(context) != PA_CONTEXT_READY)
     {
         if (!PA_CONTEXT_IS_GOOD(pa_context_get_state(context))) return ContextReadiness::Failed;
-        if (timer.elapsed() > timeoutMs) return ContextReadiness::TimedOut;
+        // The event's own flag, not a clock: elapsed() truncates, so it can read the deadline as not yet passed.
+        if (wakeup.expired()) return ContextReadiness::TimedOut;
         pa_threaded_mainloop_wait(mainloop);
     }
     return ContextReadiness::Ready;
