@@ -15,8 +15,7 @@ jobs:
       # Read from setup, so CI builds against exactly what a user's install gets.
       - run: pacman -S --noconfirm --needed $(sed -n 's/^omarchy pkg add //p' setup)
       - run: cmake -S daemon -B daemon/build -G Ninja && cmake --build daemon/build
-      # tst_blemanager starts a real discovery agent, which fails at once without a BlueZ adapter.
-      - run: ctest --test-dir daemon/build --output-on-failure -E tst_blemanager
+      - run: ctest --test-dir daemon/build --output-on-failure
         env:
           QT_QPA_PLATFORM: offscreen
       - run: deno run --allow-read tests/model.test.js

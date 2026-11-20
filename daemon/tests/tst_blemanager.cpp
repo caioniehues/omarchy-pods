@@ -23,6 +23,14 @@ static QBluetoothDeviceInfo advertisement(const QByteArray &data)
     return info;
 }
 
+// Without an adapter the real agent's start() fails at once, so its own errors are cut off and the tests drive them.
+static void detachAgent(BleManager &manager)
+{
+    auto *agent = manager.findChild<QBluetoothDeviceDiscoveryAgent *>(QString(), Qt::FindDirectChildrenOnly);
+    QVERIFY(agent);
+    QObject::disconnect(agent, nullptr, &manager, nullptr);
+}
+
 // 0x10 is Apple's nearby info type, long enough to pass the size check and still not ours.
 static QByteArray typeSwapped(const QByteArray &frame)
 {
@@ -51,6 +59,7 @@ static QByteArray withRightPodPrimary(const QByteArray &frame)
 static int parseFrame(const QByteArray &frame, BleInfo *emitted)
 {
     BleManager manager;
+    detachAgent(manager);
     int emissions = 0;
     QObject::connect(&manager, &BleManager::deviceFound, &manager, [&](const BleInfo &device) {
         if (emitted)
@@ -190,6 +199,7 @@ void TestBleManager::retryDelayDoublesAndCaps()
 void TestBleManager::scanErrorArmsARetryAndKeepsTheIntent()
 {
     BleManager manager;
+    detachAgent(manager);
 
     manager.startScan();
     seeAdvertisement(manager);
@@ -210,6 +220,7 @@ void TestBleManager::scanErrorArmsARetryAndKeepsTheIntent()
 void TestBleManager::advertisementResetsTheRetryLadder()
 {
     BleManager manager;
+    detachAgent(manager);
     QTimer *retry = retryTimerOf(manager);
     QVERIFY(retry);
 
@@ -230,6 +241,7 @@ void TestBleManager::advertisementResetsTheRetryLadder()
 void TestBleManager::stoppedScanIsNotRestartedByAFailure()
 {
     BleManager manager;
+    detachAgent(manager);
     QTimer *retry = retryTimerOf(manager);
     QVERIFY(retry);
 
@@ -252,6 +264,7 @@ void TestBleManager::stoppedScanIsNotRestartedByAFailure()
 void TestBleManager::adapterPowerOnRestartsAWantedScan()
 {
     BleManager manager;
+    detachAgent(manager);
     QTimer *retry = retryTimerOf(manager);
     QVERIFY(retry);
 
@@ -273,6 +286,7 @@ void TestBleManager::adapterPowerOnRestartsAWantedScan()
 void TestBleManager::finishedWindowArmsTheGapUntilStopped()
 {
     BleManager manager;
+    detachAgent(manager);
     QTimer *idle = idleTimerOf(manager);
     QVERIFY(idle);
 
@@ -292,6 +306,7 @@ void TestBleManager::finishedWindowArmsTheGapUntilStopped()
 void TestBleManager::adapterModeChangeKeepsTheGap()
 {
     BleManager manager;
+    detachAgent(manager);
     QTimer *idle = idleTimerOf(manager);
     QVERIFY(idle);
 
