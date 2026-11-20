@@ -88,6 +88,11 @@ public:
         connect(m_notifier, &Notifier::enabledChanged, this, &AirPodsTrayApp::saveNotificationsEnabled);
         connect(m_notifier, &Notifier::enabledChanged, this, &AirPodsTrayApp::notificationsEnabledChanged);
         connect(m_deviceInfo, &DeviceInfo::batteryStatusChanged, this, &AirPodsTrayApp::checkLowBatteryThresholds);
+        // The AirPods read the case only while a pod is docked, so the last reading outlives a restart.
+        connect(m_deviceInfo->getBattery(), &Battery::caseRead, this, [this](quint8 level, bool) {
+            m_settings->setValue("case/level", level);
+            m_settings->setValue("case/seenAt", QDateTime::currentSecsSinceEpoch());
+        });
 
         // Headless has no tray to take the fallback, so say so rather than dropping the toast silently.
         if (headless) {
@@ -358,6 +363,8 @@ public slots:
         const QString addr = m_deviceInfo->bluetoothAddress();
         LOG_INFO("Forgetting device: " << addr);
         ++m_forgetCallsTotal;
+        // The saved case reading belongs to the pair being forgotten.
+        m_settings->remove("case");
         auto *proc = new QProcess(this);
         connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 proc, [proc, addr](int code, QProcess::ExitStatus) {
@@ -2374,6 +2381,12 @@ public:
             caseObj.insert("level",    b->getCaseLevel());
             caseObj.insert("charging", b->isCaseCharging());
             status.insert("case", caseObj);
+            if (m_settings->contains("case/seenAt")) {
+                QJsonObject lastCase;
+                lastCase.insert("level", m_settings->value("case/level").toInt());
+                lastCase.insert("seen_at", m_settings->value("case/seenAt").toLongLong());
+                status.insert("case_last", lastCase);
+            }
             // A Max reports one battery in Component::Headset, which left, right and case cannot express.
             QJsonObject headsetObj;
             headsetObj.insert("available", b->isHeadsetAvailable());

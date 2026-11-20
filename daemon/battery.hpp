@@ -86,6 +86,7 @@ public:
         }
 
         QMap<Component, BatteryState> newStates = states;
+        bool freshCase = false;
 
         // Track pods to determine primary and secondary based on order
         QList<Component> podsInPacket;
@@ -110,6 +111,9 @@ public:
             if (status != BatteryStatus::Disconnected)
             {
                 newStates[comp] = {level, status};
+                if (comp == Component::Case) {
+                    freshCase = true;
+                }
             }
 
             // If this is a pod (Left or Right), add it to the list
@@ -145,6 +149,9 @@ public:
 
         // Emit signal to notify about battery status change
         emit batteryStatusChanged();
+        if (freshCase) {
+            emit caseRead(getCaseLevel(), isCaseCharging());
+        }
 
         if (primaryPod == Component::Headset) {
             LOG_INFO("Primary Pod:" << primaryPod);
@@ -174,6 +181,7 @@ public:
         unsigned char rawLeftBatteryByte = static_cast<unsigned char>(packet.at(leftByteIndex));
         unsigned char rawRightBatteryByte = static_cast<unsigned char>(packet.at(rightByteIndex));
         unsigned char rawCaseBatteryByte = static_cast<unsigned char>(packet.at(3));
+        bool freshCase = false;
 
         // Extract battery data (charging status and raw level 0-127)
         auto [isLeftCharging, rawLeftBattery] = formatBattery(rawLeftBatteryByte);
@@ -200,6 +208,7 @@ public:
                 isRightCharging = states.value(Component::Right).status == BatteryStatus::Charging;
             }
 
+            const bool caseByteIsReading = rawCaseBattery != CHAR_MAX;
             if (rawCaseBattery == CHAR_MAX) {
                 rawCaseBattery = states.value(Component::Case).level; // Use last valid level
                 isCaseCharging = states.value(Component::Case).status == BatteryStatus::Charging;
@@ -211,12 +220,16 @@ public:
             // Only a docked pod can read the case, so the payload's 0 there means unknown and writing it would publish a flat case and trip the low-battery latch.
             if ((rawCaseBattery > 0 || podInCase) && rawCaseBattery <= 100) {
                 states[Component::Case] = {static_cast<quint8>(rawCaseBattery), isCaseCharging ? BatteryStatus::Charging : BatteryStatus::Discharging};
+                freshCase = caseByteIsReading;
             }
             primaryPod = isLeftPodPrimary ? Component::Left : Component::Right;
             secondaryPod = isLeftPodPrimary ? Component::Right : Component::Left;
         }
         emit batteryStatusChanged();
         emit primaryChanged();
+        if (freshCase) {
+            emit caseRead(getCaseLevel(), this->isCaseCharging());
+        }
 
         return true;
     }
@@ -293,6 +306,8 @@ public:
 
 signals:
     void batteryStatusChanged();
+    // A reading the AirPods just sent, never a level carried over from an earlier packet.
+    void caseRead(quint8 level, bool charging);
     void primaryChanged();
 
 private:

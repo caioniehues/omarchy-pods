@@ -40,6 +40,7 @@ does not use it, and runs `librepods-ctl` only for the control verbs below.
 | `codec` | string | the user's codec choice, `SBC-XQ` or `AAC`; the card falls back to the highest bitrate when it lacks that one |
 | `left`, `right` | object | `{available, level, charging, in_ear}` |
 | `case` | object | `{available, level, charging}`, no `in_ear` |
+| `case_last` | object | `{level, seen_at}`, the last case reading the AirPods sent, kept across restarts; `seen_at` in Unix seconds; absent until the first one |
 | `conversational_awareness` | bool | Pro only |
 | `adaptive_noise_level` | int | 0-100, only meaningful while `noise_mode` is 3 |
 | `one_bud_anc_mode` | bool | Pro only |

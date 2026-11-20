@@ -272,7 +272,11 @@ Panel {
                 width: parent.width
                 label: "Case"
                 pod: ({ level: pods.caseBattery.level, charging: pods.caseBattery.charging, inEar: false })
-                meta: root.lidLabel
+                // Re-read on open, since the age only moves in minutes.
+                meta: pods.caseBattery.seenAt > 0 && root.opened
+                      ? Model.ageText(pods.caseBattery.seenAt, Date.now() / 1000)
+                      : root.lidLabel
+                stale: pods.caseBattery.seenAt > 0
               }
             }
           }
@@ -433,6 +437,8 @@ Panel {
     property string label: ""
     property var pod: Model.defaultPod()
     property string meta: ""
+    // A saved reading rather than a live one.
+    property bool stale: false
 
     readonly property string metaText: meta !== "" ? meta : Model.podMeta(pod)
     readonly property bool low: pod.level !== Model.LEVEL_UNKNOWN
@@ -470,6 +476,7 @@ Panel {
           height: parent.height
           radius: parent.radius
           color: podRow.low ? root.urgent : root.foreground
+          opacity: podRow.stale ? 0.4 : 1.0
         }
       }
 
@@ -477,6 +484,7 @@ Panel {
         textFormat: Text.PlainText
         text: Model.levelText(podRow.pod.level)
         color: root.foreground
+        opacity: podRow.stale ? 0.6 : 1.0
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
         horizontalAlignment: Text.AlignRight

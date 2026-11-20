@@ -132,6 +132,19 @@ private:
         return p;
     }
 
+    // A one-entry AAP battery packet carrying only the case.
+    QByteArray casePacket(int level, Battery::BatteryStatus status)
+    {
+        QByteArray buf = AirPodsPackets::Parse::BATTERY_STATUS;
+        buf.append(static_cast<char>(1));
+        buf.append(static_cast<char>(Battery::Component::Case));
+        buf.append(static_cast<char>(0x01));
+        buf.append(static_cast<char>(level));
+        buf.append(static_cast<char>(status));
+        buf.append(static_cast<char>(0x01));
+        return buf;
+    }
+
 private slots:
     void encryptedCaseZero_isUnknownWhileNothingIsDockedToReadIt()
     {
@@ -157,6 +170,34 @@ private slots:
         QVERIFY(b.parseEncryptedPacket(payload(80, 80, 0), true, false, false));
         QVERIFY(b.isCaseAvailable());
         QCOMPARE(b.getCaseLevel(), quint8(80));
+    }
+
+    void caseRead_firesForACaseTheAirPodsReport()
+    {
+        Battery b;
+        QSignalSpy spy(&b, &Battery::caseRead);
+        QVERIFY(b.parsePacket(casePacket(67, Battery::BatteryStatus::Charging)));
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).value<quint8>(), quint8(67));
+        QCOMPARE(spy.at(0).at(1).toBool(), true);
+    }
+
+    void caseRead_staysQuietForADisconnectedCase()
+    {
+        Battery b;
+        QSignalSpy spy(&b, &Battery::caseRead);
+        QVERIFY(b.parsePacket(casePacket(0, Battery::BatteryStatus::Disconnected)));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void caseRead_staysQuietForARepeatedOldLevel()
+    {
+        Battery b;
+        QVERIFY(b.parseEncryptedPacket(payload(80, 80, 70), true, true, false));
+        QSignalSpy spy(&b, &Battery::caseRead);
+        QVERIFY(b.parseEncryptedPacket(payload(80, 80, 0x7F), true, true, false));
+        QVERIFY(b.parseEncryptedPacket(payload(80, 80, 0), true, false, false));
+        QCOMPARE(spy.count(), 0);
     }
 
     // Observed on an AirPods Max (USB-C, A3184): byte 1 held 100 while primaryLeft went true then false.

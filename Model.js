@@ -68,7 +68,7 @@ function defaultStatus() {
     lidState: LID_UNKNOWN,
     left: defaultPod(),
     right: defaultPod(),
-    caseBattery: { level: LEVEL_UNKNOWN, charging: false },
+    caseBattery: { level: LEVEL_UNKNOWN, charging: false, seenAt: 0 },
     headset: { level: LEVEL_UNKNOWN, charging: false }
   }
 }
@@ -171,7 +171,12 @@ function parseStatus(raw) {
   status.left = podFrom(parsed.left)
   status.right = podFrom(parsed.right)
   var caseRaw = podFrom(parsed["case"])
-  status.caseBattery = { level: caseRaw.level, charging: caseRaw.charging }
+  status.caseBattery = { level: caseRaw.level, charging: caseRaw.charging, seenAt: 0 }
+  // The AirPods read the case only with a pod docked, so after a restart the daemon's saved reading stands in.
+  var last = parsed.case_last
+  if (caseRaw.level === LEVEL_UNKNOWN && last && typeof last.seen_at === "number" && last.seen_at > 0) {
+    status.caseBattery = { level: intOr(last.level, LEVEL_UNKNOWN), charging: false, seenAt: last.seen_at }
+  }
   var headsetRaw = podFrom(parsed.headset)
   status.headset = { level: headsetRaw.level, charging: headsetRaw.charging }
   return status
@@ -238,6 +243,15 @@ function lidText(lidState) {
   if (lidState === LID_OPEN) return "Open"
   if (lidState === LID_CLOSED) return "Closed"
   return ""
+}
+
+// Both in seconds since the epoch.
+function ageText(seenAt, now) {
+  var seconds = Math.max(0, now - seenAt)
+  if (seconds < 60) return "just now"
+  if (seconds < 3600) return Math.floor(seconds / 60) + " min ago"
+  if (seconds < 86400) return Math.floor(seconds / 3600) + " h ago"
+  return Math.floor(seconds / 86400) + " d ago"
 }
 
 function podMeta(pod) {

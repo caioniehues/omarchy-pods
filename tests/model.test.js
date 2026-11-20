@@ -3,7 +3,7 @@
 
 const source = Deno.readTextFileSync(new URL("../Model.js", import.meta.url))
 const Model = new Function(
-  source + "; return { parseStatus, podFrom, defaultPod, noiseModeVerb, earDetectionVerb, codecVerb, levelFraction, levelText, podMeta, elideError, availableModes, NOISE_OFF, NOISE_ANC, NOISE_TRANSPARENCY, NOISE_ADAPTIVE, LEVEL_UNKNOWN, NOISE_UNKNOWN, EAR_PAUSE_ONE_OUT, LID_UNKNOWN, MAX_ERROR_CHARS, MAX_STATUS_BYTES }"
+  source + "; return { parseStatus, podFrom, defaultPod, noiseModeVerb, earDetectionVerb, codecVerb, ageText, levelFraction, levelText, podMeta, elideError, availableModes, NOISE_OFF, NOISE_ANC, NOISE_TRANSPARENCY, NOISE_ADAPTIVE, LEVEL_UNKNOWN, NOISE_UNKNOWN, EAR_PAUSE_ONE_OUT, LID_UNKNOWN, MAX_ERROR_CHARS, MAX_STATUS_BYTES }"
 )()
 
 let failures = 0
@@ -24,7 +24,7 @@ check("live line parses", good.ok, true)
 check("live modelName", good.modelName, "AirPods Pro 3")
 check("live deviceName keeps the daemon's apostrophe", good.deviceName, "GM’s AirPods Pro")
 check("live left level", good.left.level, 79)
-check("live case has no in_ear", good.caseBattery, { level: 100, charging: false })
+check("live case has no in_ear", good.caseBattery, { level: 100, charging: false, seenAt: 0 })
 check("live supportsNoiseOff is honoured", good.supportsNoiseOff, false)
 check("live noiseMode", good.noiseMode, 1)
 
@@ -52,6 +52,15 @@ check("fresh left is the default pod", fresh.left, Model.defaultPod())
 check("fresh case is unknown", fresh.caseBattery.level, Model.LEVEL_UNKNOWN)
 check("supports_noise_off absent means the model has Off", fresh.supportsNoiseOff, true)
 check("codec absent reads as empty, which hides the row", fresh.codec, "")
+check("no case reading at all leaves the case unknown", fresh.caseBattery, { level: Model.LEVEL_UNKNOWN, charging: false, seenAt: 0 })
+const docked = Model.parseStatus('{"case":{"available":true,"level":80,"charging":true},"case_last":{"level":67,"seen_at":1000},"schema_version":1}')
+check("a live case wins over the saved one", docked.caseBattery, { level: 80, charging: true, seenAt: 0 })
+const restarted = Model.parseStatus('{"case":{"available":false,"level":0,"charging":false},"case_last":{"level":67,"seen_at":1000},"schema_version":1}')
+check("an unread case shows the saved level, never charging", restarted.caseBattery, { level: 67, charging: false, seenAt: 1000 })
+check("age under a minute", Model.ageText(1000, 1030), "just now")
+check("age in minutes", Model.ageText(1000, 1000 + 5 * 60), "5 min ago")
+check("age in hours", Model.ageText(1000, 1000 + 3 * 3600 + 59), "3 h ago")
+check("age in days", Model.ageText(1000, 1000 + 2 * 86400), "2 d ago")
 check("codec is read as the daemon wrote it", Model.parseStatus('{"codec":"AAC","schema_version":1}').codec, "AAC")
 check("codec verb for SBC-XQ", Model.codecVerb("SBC-XQ"), "codec:sbc-xq")
 check("codec verb for AAC", Model.codecVerb("AAC"), "codec:aac")
