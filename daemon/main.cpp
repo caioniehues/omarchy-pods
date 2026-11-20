@@ -643,6 +643,13 @@ public slots:
             // recorder is noticed at once rather than up to one poll later.
             connect(mediaController->pulseAudio(), &PulseAudioController::sourceOutputsChanged, this,
                     &AirPodsTrayApp::pollHiResRecorder, Qt::QueuedConnection);
+            // The new server lost our pipe source with the old one, so it is published again.
+            connect(mediaController->pulseAudio(), &PulseAudioController::connectionRestored, this, [this]() {
+                if (m_hiResMic.isRunning()) {
+                    m_hiResMic.stop();
+                    startHiResMicSource();
+                }
+            });
         }
         m_hiResMonitor->start();
     }

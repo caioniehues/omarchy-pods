@@ -77,6 +77,8 @@ public:
 signals:
     // A recording stream appeared, went or changed (corked or not) on any source.
     void sourceOutputsChanged();
+    // A new server came up, without the modules the old one had loaded.
+    void connectionRestored();
 
 private:
     pa_threaded_mainloop *m_mainloop = nullptr;

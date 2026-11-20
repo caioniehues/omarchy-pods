@@ -263,6 +263,7 @@ void PulseAudioController::attemptReconnect()
     m_reconnectAttempts = 0;
     pa_threaded_mainloop_unlock(m_mainloop);
     LOG_INFO("PulseAudio connection restored");
+    emit connectionRestored();
 }
 
 QString PulseAudioController::getDefaultSink()
