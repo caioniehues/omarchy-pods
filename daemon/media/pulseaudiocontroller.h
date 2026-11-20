@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <functional>
 #include <atomic>
 #include <pulse/pulseaudio.h>
 
@@ -56,6 +57,8 @@ public:
 
     // Live while any stream is attached to this address's mic, which is what a call holds.
     CaptureState captureState(const QString &macAddress);
+    // The hi-res source carries no address in its name, so it is matched exactly.
+    CaptureState captureStateForSource(const QString &sourceName);
     // Every profile this card reports, for the pure choice in profilechoice.hpp.
     QVector<ProfileCandidate> getCardProfiles(const QString &cardName);
 
@@ -94,4 +97,6 @@ private:
 
     void scheduleReconnect();
     void attemptReconnect();
+    CaptureState captureStateMatching(const std::function<bool(const QString &)> &matches,
+                                      const QString &what);
 };
