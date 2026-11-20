@@ -80,10 +80,10 @@ static void seeAdvertisement(BleManager &manager)
                                     advertisement(QByteArray::fromHex(airPodsFrameHex))));
 }
 
-// discoveryAgent is the only other direct child, and it is not a QTimer.
+// The duty cycle's idle timer is a second QTimer child, so look the retry timer up by name.
 static QTimer *retryTimerOf(BleManager &manager)
 {
-    return manager.findChild<QTimer *>(QString(), Qt::FindDirectChildrenOnly);
+    return manager.findChild<QTimer *>(QStringLiteral("bleScanRetry"), Qt::FindDirectChildrenOnly);
 }
 
 class TestBleManager : public QObject

@@ -105,6 +105,7 @@ BleManager::BleManager(QObject *parent) : QObject(parent)
             this, &BleManager::onErrorOccurred);
 
     retryTimer = new QTimer(this);
+    retryTimer->setObjectName(QStringLiteral("bleScanRetry"));
     retryTimer->setSingleShot(true);
     connect(retryTimer, &QTimer::timeout, this, &BleManager::retryScan);
 }
