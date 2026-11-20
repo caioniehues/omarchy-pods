@@ -1752,7 +1752,8 @@ public:
         status.insert("is_pro_series", d ? isProSeriesAirPods(d->model()) : false);
         // The panel needs the shape before any battery packet has arrived.
         status.insert("is_headset", d ? isModelHeadset(d->model()) : false);
-        status.insert("supports_noise_off", d ? supportsNoiseOff(d->model()) : true);
+        // Off applies only while the pods' Allow Off setting is on, which they never report, so the row is always offered.
+        status.insert("supports_noise_off", true);
         // Additive keys: a panel that reads none of them keeps its is_pro_series behaviour.
         status.insert("supports_noise_control", d ? supportsNoiseControl(d->model()) : true);
         status.insert("supports_adaptive", d ? supportsAdaptiveAudio(d->model()) : false);

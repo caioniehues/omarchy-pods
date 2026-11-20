@@ -1,51 +1,45 @@
 ---
 type: reference
-title: AirPods Pro 3 do have an Off listening mode on current firmware
-description: The Off packet applies and the pods report noise_mode 0 back, reversing the August reading, so the model rule that hid the row is gone
+title: AirPods Pro 3 apply Off only while their Allow Off setting is on
+description: The Off packet is ignored until the Off listening mode option is enabled from an iPhone, and the pods never report that setting, so the panel always offers Off
 tags: [airpods, aap, listening-mode]
 status: stable
 verified:
-  - by: three consecutive noise:off attempts against a real AirPods Pro 3 with both pods in ear, with noise:anc and noise:transparency as controls
-    at: 2026-09-10
+  - by: three noise:off attempts against an AirPods Pro 3 with both pods in ear, before and after enabling the Off listening mode option on an iPhone, with noise:transparency as control
+    at: 2026-11-19
 ---
 
 # The measurement
 
-With both pods in ear and the daemon holding the AAP link:
+Both pods in ear, the daemon holding the AAP link, started in Noise Cancellation.
+The daemon wrote the Off packet all three times in both runs.
 
 ```
-start mode: 3
-after noise:off attempt 1 -> mode 0
-after noise:off attempt 2 -> mode 0
-after noise:off attempt 3 -> mode 0
-control: after noise:anc -> mode 1
-control: after noise:transparency -> mode 2
+iPhone Off option disabled:  noise:off x3 -> mode 1, held 1 over 12 s; transparency -> 2
+iPhone Off option enabled:   noise:off x3 -> mode 0, held 0 over 12 s; transparency -> 2
 ```
 
-Off then held across four reads over twelve seconds rather than snapping back.
+The 2026-08-16 reading (Off ignored) and the 2026-09-10 reading (Off applied)
+were both true. They differ in this setting, not in the model or, as assumed
+then, the firmware.
 
-`noise_mode` is only ever written from an inbound packet in `main.cpp`, and
-`DeviceInfo` defaults to `Transparency` rather than `Off`, so a 0 can only have
-come from the pods.
+# Why the daemon cannot follow the setting
 
-# What this reverses
-
-An earlier measurement on 2026-08-16 sent the same three attempts to a Pro 3
-and the mode did not move, which is why `supportsNoiseOff` carried a Pro 3
-exception and the panel drew three rows. The firmware appears to have gained
-the mode since. That reading is recorded here rather than deleted, because a
-Pro 3 on older firmware will still behave the way it describes.
+The setting is control command `0x34` (`AirPodsPackets::AllowOffOption`). On
+connect the pods report 21 control command states, and `0x34` is not among
+them. The iPhone can only change it while the pods are connected to the phone,
+so a laptop holding the link sees no change either. Writing `0x34` from the
+daemon is untested.
 
 # A second, separate rejection
 
 Every listening-mode change is ignored while the pods are out of the ears,
-whatever the mode. That has not changed, and it is still the first thing to
-check when a mode will not apply.
+whatever the mode. That is still the first thing to check when a mode will not
+apply.
 
 # What the code does
 
-`supportsNoiseOff` returns true for every model. The daemon still exports
-`supports_noise_off` in the status line and the panel still builds both its row
-list and its right-click cycle from `Service.availableModes()`, so a model that
-turns out to lack Off can be corrected in the daemon without touching the
-display. A daemon too old to send the field is treated as supporting Off.
+The daemon exports `supports_noise_off` as true, so the panel offers Off for every model. With
+the iPhone option disabled the Off row does nothing; the pods stay in their
+current mode and the panel shows that mode. A daemon too old to send the key is
+treated as supporting Off.

@@ -69,3 +69,11 @@ than quietly rewritten.
   `noise_mode` 0 back, reversing the 2026-08-16 reading. The model rule in
   `supportsNoiseOff` that hid the row is gone, and `tst_enums` pins the new
   behaviour.
+
+## 2026-11-19
+
+- `airpods-pro-3-off-mode` rewritten. On a second Pro 3, Off was ignored until
+  the Off listening mode option was enabled on an iPhone, then applied. Both
+  earlier readings were true; the difference is that setting, not firmware.
+  The pods never report it (`0x34`), so the `supportsNoiseOff` helper is gone, the
+  daemon exports `supports_noise_off` as true and the panel always offers Off.

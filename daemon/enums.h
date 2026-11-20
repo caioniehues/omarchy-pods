@@ -148,11 +148,6 @@ namespace AirpodsTrayApp
             }
         }
 
-        // Published for every model but only meaningful where supportsNoiseControl is true.
-        inline bool supportsNoiseOff(AirPodsModel) {
-            return true;
-        }
-
         // Listening modes at all: AirPods 1, 2, 3 and the plain AirPods 4 have none.
         inline bool supportsNoiseControl(AirPodsModel model) {
             switch (model) {
