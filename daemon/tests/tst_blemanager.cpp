@@ -248,7 +248,7 @@ void TestBleManager::stoppedScanIsNotRestartedByAFailure()
     QVERIFY(!manager.isScanning());
 }
 
-// The adapter drops a live scan with no signal, so the power state must start it again.
+// Powering the adapter on cuts short a retry that is still waiting.
 void TestBleManager::adapterPowerOnRestartsAWantedScan()
 {
     BleManager manager;

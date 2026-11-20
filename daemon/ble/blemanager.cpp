@@ -171,7 +171,7 @@ void BleManager::onHostModeChanged(QBluetoothLocalDevice::HostMode mode)
         return;
     }
 
-    LOG_INFO("Bluetooth adapter powered on, restarting the BLE scan");
+    LOG_INFO("Bluetooth adapter mode changed, restarting the BLE scan");
     startScan();
 }
 
