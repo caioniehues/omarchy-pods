@@ -77,8 +77,96 @@ void HiResMic::closeDecoder()
     if (m_ctx) avcodec_free_context(&m_ctx);
 }
 
-bool HiResMic::publishSource()
+namespace {
+// Every module-pipe-source this daemon loaded, by index, from "pactl list modules short".
+QList<QPair<unsigned, QString>> ourModules()
 {
+    QProcess pactl;
+    pactl.start("pactl", {"list", "modules", "short"});
+    QList<QPair<unsigned, QString>> modules;
+    if (!pactl.waitForFinished(5000) || pactl.exitCode() != 0) {
+        return modules;
+    }
+    const QString marker = QStringLiteral("source_name=%1 ").arg(kSourceName);
+    for (const QString &line : QString::fromUtf8(pactl.readAllStandardOutput()).split('\n')) {
+        const QStringList fields = line.split('\t');
+        if (fields.size() >= 3 && fields[1] == QStringLiteral("module-pipe-source") && fields[2].contains(marker)) {
+            modules.append({fields[0].toUInt(), fields[2]});
+        }
+    }
+    return modules;
+}
+
+bool sourceExists()
+{
+    QProcess pactl;
+    pactl.start("pactl", {"list", "sources", "short"});
+    if (!pactl.waitForFinished(5000) || pactl.exitCode() != 0) {
+        return false;
+    }
+    for (const QString &line : QString::fromUtf8(pactl.readAllStandardOutput()).split('\n')) {
+        const QStringList fields = line.split('\t');
+        if (fields.size() >= 2 && fields[1] == QLatin1String(kSourceName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isFifo(const QString &path)
+{
+    struct stat st {};
+    return stat(path.toLocal8Bit().constData(), &st) == 0 && S_ISFIFO(st.st_mode);
+}
+}
+
+namespace {
+QString cleanLabel(QString label)
+{
+    return label.remove('"').remove('\'').remove('\\');
+}
+}
+
+// A source under another name (the AirPods were renamed) is recreated rather than adopted.
+bool HiResMic::adoptSource(const QString &label)
+{
+    const QString fifo = fifoPath();
+    const auto modules = ourModules();
+    unsigned keep = 0;
+    if (isFifo(fifo) && sourceExists()) {
+        for (const auto &module : modules) {
+            if (module.second.contains(QStringLiteral("file=%1 ").arg(fifo))
+                && module.second.contains(QStringLiteral("device.description=\"%1\"").arg(label))) {
+                keep = module.first;
+                break;
+            }
+        }
+    }
+    for (const auto &module : modules) {
+        if (module.first != keep) {
+            LOG_WARN("Unloading stale hi-res module " << module.first);
+            QProcess::execute("pactl", {"unload-module", QString::number(module.first)});
+        }
+    }
+    if (keep == 0) {
+        return false;
+    }
+    m_fifo = open(fifo.toLocal8Bit().constData(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+    if (m_fifo < 0) {
+        QProcess::execute("pactl", {"unload-module", QString::number(keep)});
+        return false;
+    }
+    m_module = keep;
+    LOG_INFO("Reusing the hi-res mic source left by an earlier run, module " << m_module);
+    return true;
+}
+
+bool HiResMic::publishSource(const QString &description)
+{
+    const QString label = cleanLabel(description);
+    if (adoptSource(label)) {
+        return true;
+    }
     const QString fifo = fifoPath();
     QFile::remove(fifo);
     if (mkfifo(fifo.toLocal8Bit().constData(), 0600) != 0) {
@@ -93,13 +181,17 @@ bool HiResMic::publishSource()
         return false;
     }
 
+    // node.virtual=false gives the source the HARDWARE flag, so desktop volume applets list it.
     QProcess pactl;
     pactl.start("pactl", {"load-module", "module-pipe-source",
                           QStringLiteral("source_name=%1").arg(kSourceName),
                           QStringLiteral("file=%1").arg(fifo),
                           "format=s16le",
                           QStringLiteral("rate=%1").arg(OpenPods::HiRes::kEldSampleRate),
-                          QStringLiteral("channels=%1").arg(OpenPods::HiRes::kEldChannels)});
+                          QStringLiteral("channels=%1").arg(OpenPods::HiRes::kEldChannels),
+                          "channel_map=mono",
+                          QStringLiteral("source_properties='device.description=\"%1\" node.driver=false "
+                                         "priority.driver=0 node.virtual=false'").arg(label)});
     if (!pactl.waitForFinished(5000) || pactl.exitCode() != 0) {
         LOG_ERROR("pactl refused module-pipe-source: " << pactl.readAllStandardError().trimmed());
         ::close(m_fifo);
@@ -108,24 +200,42 @@ bool HiResMic::publishSource()
         return false;
     }
     m_module = pactl.readAllStandardOutput().trimmed().toUInt();
-    LOG_INFO("Hi-res mic source '" << kSourceName << "' ready, module " << m_module);
+    LOG_INFO("Hi-res mic source '" << kSourceName << "' (" << label << ") ready, module " << m_module);
     return m_module > 0;
 }
 
-void HiResMic::unpublishSource()
+void HiResMic::closeWriter()
+{
+    if (m_fifo >= 0) {
+        ::close(m_fifo);
+        m_fifo = -1;
+    }
+    m_writer.reset();
+}
+
+// A reader that stopped draining must not stall the control link, so a full pipe drops.
+void HiResMic::writeFifo(QByteArrayView pcm)
+{
+    m_writer.write(pcm, [this](QByteArrayView bytes) -> qsizetype {
+        const ssize_t written = ::write(m_fifo, bytes.data(), bytes.size());
+        if (written < 0 && errno != EAGAIN) {
+            ++m_errors;
+        }
+        return written;
+    });
+}
+
+void HiResMic::unloadSource()
 {
     if (m_module > 0) {
         QProcess::execute("pactl", {"unload-module", QString::number(m_module)});
         m_module = 0;
     }
-    if (m_fifo >= 0) {
-        ::close(m_fifo);
-        m_fifo = -1;
-    }
+    closeWriter();
     QFile::remove(fifoPath());
 }
 
-bool HiResMic::start()
+bool HiResMic::start(const QString &description)
 {
     if (isRunning()) {
         return true;
@@ -133,7 +243,7 @@ bool HiResMic::start()
     if (!openDecoder()) {
         return false;
     }
-    if (!publishSource()) {
+    if (!publishSource(description)) {
         closeDecoder();
         return false;
     }
@@ -144,8 +254,26 @@ bool HiResMic::start()
 
 void HiResMic::stop()
 {
-    unpublishSource();
+    closeWriter();
+    m_module = 0;
     closeDecoder();
+}
+
+void HiResMic::remove()
+{
+    if (m_module == 0) {
+        adoptSource(QString());
+    }
+    unloadSource();
+    closeDecoder();
+}
+
+void HiResMic::writePcm(QByteArrayView pcm)
+{
+    if (m_fifo < 0 || pcm.isEmpty()) {
+        return;
+    }
+    writeFifo(pcm);
 }
 
 void HiResMic::decode(QByteArrayView accessUnit)
@@ -172,11 +300,7 @@ void HiResMic::decode(QByteArrayView accessUnit)
             out[i] = OpenPods::HiRes::floatToS16(in[i]);
         }
         m_preamp.process(out, samples);
-        // A reader that stopped draining must not stall the control link, so a full pipe drops.
-        const ssize_t written = ::write(m_fifo, pcm.constData(), pcm.size());
-        if (written < 0 && errno != EAGAIN) {
-            ++m_errors;
-        }
+        writeFifo(pcm);
         ++m_frames;
     }
 }

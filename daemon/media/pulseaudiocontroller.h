@@ -58,9 +58,25 @@ public:
     // Live while any stream is attached to this address's mic, which is what a call holds.
     CaptureState captureState(const QString &macAddress);
     // The hi-res source carries no address in its name, so it is matched exactly.
-    CaptureState captureStateForSource(const QString &sourceName);
+    // A level meter records at a few hundred Hz and is not a recorder, so minRate filters it out.
+    CaptureState captureStateForSource(const QString &sourceName, quint32 minRate = 0);
+    QString getDefaultSource();
+    bool setDefaultSource(const QString &sourceName);
+    // The real microphone with the highest session priority, skipping monitors and any source
+    // the predicate rejects. Empty when there is none.
+    QString fallbackSource(const std::function<bool(const QString &)> &reject);
+    // Uncorked recording streams on a source, by index.
+    QVector<uint32_t> recordersOn(const QString &sourceName, quint32 minRate);
+    bool moveRecorder(uint32_t index, const QString &sourceName);
+    bool suspendSink(const QString &sinkName, bool suspend);
+    // The first sink of the card named for this address, e.g. bluez_output.AA_BB_..._FF.1.
+    QString sinkForAddress(const QString &macAddress);
     // Every profile this card reports, for the pure choice in profilechoice.hpp.
     QVector<ProfileCandidate> getCardProfiles(const QString &cardName);
+
+signals:
+    // A recording stream appeared, went or changed (corked or not) on any source.
+    void sourceOutputsChanged();
 
 private:
     pa_threaded_mainloop *m_mainloop = nullptr;
@@ -98,5 +114,5 @@ private:
     void scheduleReconnect();
     void attemptReconnect();
     CaptureState captureStateMatching(const std::function<bool(const QString &)> &matches,
-                                      const QString &what);
+                                      const QString &what, quint32 minRate = 0);
 };
