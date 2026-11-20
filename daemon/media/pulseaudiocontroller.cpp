@@ -18,6 +18,10 @@ constexpr int reconnectMaxDoublings = 5;
 // Matches the cap in initialize(), so a reconnect gives up on a wedged server as fast as a cold start does.
 constexpr int reconnectReadyTimeoutMs = 5000;
 
+// Sinks for the volume snap, source outputs for the hi-res mic's recorder; a reconnect must re-arm both.
+constexpr auto kSubscriptionMask =
+    static_cast<pa_subscription_mask_t>(PA_SUBSCRIPTION_MASK_SINK | PA_SUBSCRIPTION_MASK_SOURCE_OUTPUT);
+
 int reconnectDelayMs(int attempt)
 {
     const int boundedAttempt = std::clamp(attempt, 1, reconnectMaxDoublings);
@@ -159,18 +163,8 @@ bool PulseAudioController::initialize()
         return false;
     }
 
-    // Register sink-event subscription. Fires for every sink change
-    // including AVRCP AbsoluteVolume writes from the AirPods stem.
-    // snapSinkInfoCallback (invoked indirectly by subscribeCallback)
-    // does the actual 5%-grid snap when m_snapSinkName is set.
-    // Subscribe-mask covers SINK events only; we don't care about
-    // sink-input / source / card / etc. for the snap path.
     pa_context_set_subscribe_callback(m_context, &PulseAudioController::subscribeCallback, this);
-    // Source outputs too: a recorder appearing is what arms the hi-res mic, and an event is
-    // a poll interval sooner than the monitor's own timer.
-    pa_operation *subOp = pa_context_subscribe(
-        m_context, static_cast<pa_subscription_mask_t>(PA_SUBSCRIPTION_MASK_SINK | PA_SUBSCRIPTION_MASK_SOURCE_OUTPUT),
-        nullptr, nullptr);
+    pa_operation *subOp = pa_context_subscribe(m_context, kSubscriptionMask, nullptr, nullptr);
     if (subOp) pa_operation_unref(subOp);
 
     // Set under the lock: libpulse dispatches state callbacks with it held, so a context
@@ -260,8 +254,7 @@ void PulseAudioController::attemptReconnect()
 
     // The subscription lives on the context, so the volume snap stays dead until it is re-armed on the new one.
     pa_context_set_subscribe_callback(m_context, &PulseAudioController::subscribeCallback, this);
-    pa_operation *subOp = pa_context_subscribe(
-        m_context, PA_SUBSCRIPTION_MASK_SINK, nullptr, nullptr);
+    pa_operation *subOp = pa_context_subscribe(m_context, kSubscriptionMask, nullptr, nullptr);
     if (subOp) pa_operation_unref(subOp);
 
     // Set under the lock as in initialize(): otherwise a context dying in between queues a reconnect
