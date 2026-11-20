@@ -120,6 +120,7 @@ private slots:
     void stoppedScanIsNotRestartedByAFailure();
     void adapterPowerOnRestartsAWantedScan();
     void finishedWindowArmsTheGapUntilStopped();
+    void adapterModeChangeKeepsTheGap();
 };
 
 void TestBleManager::unparseableFrameIsDropped_data()
@@ -285,6 +286,21 @@ void TestBleManager::finishedWindowArmsTheGapUntilStopped()
     QVERIFY(!idle->isActive());
     finishWindow(manager);
     QVERIFY(!idle->isActive());
+}
+
+// A restart inside the gap would hand the controller back to discovery before the accept list scan gets its turn.
+void TestBleManager::adapterModeChangeKeepsTheGap()
+{
+    BleManager manager;
+    QTimer *idle = idleTimerOf(manager);
+    QVERIFY(idle);
+
+    manager.startScan();
+    finishWindow(manager);
+    powerAdapterOn(manager);
+    QVERIFY(idle->isActive());
+
+    manager.stopScan();
 }
 
 QTEST_GUILESS_MAIN(TestBleManager)

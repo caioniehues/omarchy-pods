@@ -163,18 +163,15 @@ void BleManager::retryScan()
     discoveryAgent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
 }
 
-// The agent gets no signal when the adapter drops a live scan, and it still reports that scan as active.
-// The host mode change is the only event left, so use it to start the scan again.
+// A window outlives a power cut and ends on its timer, so only a scan waiting out the retry delay needs the shortcut.
 void BleManager::onHostModeChanged(QBluetoothLocalDevice::HostMode mode)
 {
-    if (mode == QBluetoothLocalDevice::HostPoweredOff || !duty.isRequested())
+    if (mode == QBluetoothLocalDevice::HostPoweredOff || !retryTimer->isActive())
     {
         return;
     }
 
     LOG_INFO("Bluetooth adapter powered on, restarting the BLE scan");
-    // Call stop() first, because start() does nothing while the agent still reports an active scan.
-    discoveryAgent->stop();
     startScan();
 }
 
