@@ -470,6 +470,10 @@ void PulseAudioController::snapSinkInfoCallback(pa_context *c,
 bool PulseAudioController::setCardProfile(const QString &cardName, const QString &profileName)
 {
     if (!m_initialized) return false;
+    if (isHeadsetProfile(profileName)) {
+        LOG_WARN("Refusing card profile " << profileName << " on " << cardName << ": headset profiles replace playback");
+        return false;
+    }
 
     pa_threaded_mainloop_lock(m_mainloop);
     

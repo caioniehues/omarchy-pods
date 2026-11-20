@@ -50,6 +50,12 @@ inline QString codecFromProfileName(const QString &name)
     return suffix.toUpper().replace('_', '-');
 }
 
+// Sample input: "headset-head-unit-cvsd". Every profile change goes through this, so none can drop playback to 16 kHz.
+inline bool isHeadsetProfile(const QString &name)
+{
+    return name.startsWith("headset-head-unit");
+}
+
 // Description PulseAudio gave this profile, empty when the card does not have it.
 inline QString profileDescription(const QVector<ProfileCandidate> &candidates, const QString &name)
 {

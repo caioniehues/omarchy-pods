@@ -16,6 +16,7 @@ private slots:
     void returnsEmptyWhenNothingQualifies();
     void readsTheCodecOutOfAProfileDescription();
     void readsTheCodecOutOfTheProfileNameToo();
+    void refusesEveryHeadsetProfileByName();
 };
 
 static QVector<ProfileCandidate> airPodsCard()
@@ -153,6 +154,15 @@ void TestProfileChoice::readsTheCodecOutOfTheProfileNameToo()
         {"a2dp-sink-sbc_xq", "Reproduccion de alta fidelidad (A2DP Sink)", 131, true, 1, 0},
     };
     QCOMPARE(bestPlaybackProfile(translated), QString("a2dp-sink-sbc_xq"));
+}
+
+void TestProfileChoice::refusesEveryHeadsetProfileByName()
+{
+    QVERIFY(isHeadsetProfile("headset-head-unit"));
+    QVERIFY(isHeadsetProfile("headset-head-unit-cvsd"));
+    QVERIFY(!isHeadsetProfile("a2dp-sink-sbc_xq"));
+    QVERIFY(!isHeadsetProfile("a2dp-sink"));
+    QVERIFY(!isHeadsetProfile("off"));
 }
 
 QTEST_GUILESS_MAIN(TestProfileChoice)
