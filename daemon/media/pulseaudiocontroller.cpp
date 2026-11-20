@@ -5,7 +5,6 @@
 #include "profilechoice.hpp"
 #include "logger.h"
 #include "../snaptogrid.hpp"
-#include <QElapsedTimer>
 #include <QThread>
 #include <algorithm>
 
@@ -29,7 +28,7 @@ int reconnectDelayMs(int attempt)
 }
 
 // Only a context state change signals the mainloop, and a server that accepts then stalls sends none,
-// so this time event is the one wakeup that lets the readiness wait see its deadline.
+// so this time event is the one wakeup that lets a wait see its deadline.
 class MainloopWakeup
 {
 public:
@@ -42,7 +41,7 @@ public:
         m_event = m_api->time_new(m_api, &tv, &MainloopWakeup::fire, this);
     }
 
-    // Runs with the mainloop lock held, because every caller unlocks only after the readiness wait returns.
+    // Runs with the mainloop lock held, because every caller unlocks only after its wait returns.
     ~MainloopWakeup()
     {
         if (m_event) m_api->time_free(m_event);
@@ -972,11 +971,12 @@ bool PulseAudioController::waitForOperation(pa_operation *op)
 {
     if (!op) return false;
 
-    QElapsedTimer timer; timer.start();
-    constexpr qint64 kOpTimeoutMs = 3000;
+    constexpr int kOpTimeoutMs = 3000;
+    // A server that stalls a reply sends nothing else either, so only this event ends the wait.
+    MainloopWakeup wakeup(m_mainloop, kOpTimeoutMs);
     while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
     {
-        if (timer.elapsed() > kOpTimeoutMs) {
+        if (wakeup.expired()) {
             LOG_WARN("PulseAudio operation timed out after 3s");
             pa_operation_cancel(op);
             return false;
