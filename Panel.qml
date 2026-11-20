@@ -52,6 +52,7 @@ Panel {
   readonly property bool caVisible: pods.hasAirPods && pods.supportsConversationalAwareness
   readonly property bool oneBudVisible: pods.hasAirPods && pods.supportsOneBudANC
   readonly property bool hiResMicVisible: pods.hasAirPods && pods.supportsHiResMic
+  readonly property bool codecVisible: pods.hasAirPods && pods.codec !== ""
   readonly property string lidLabel: Model.lidText(pods.lidState)
 
   // The daemon names the family, so the mark is the shape of the device actually connected.
@@ -69,6 +70,7 @@ Panel {
     if (caVisible) rows.push("ca")
     if (oneBudVisible) rows.push("onebud")
     if (hiResMicVisible) rows.push("mic")
+    if (codecVisible) rows.push("codec")
     rows.push("ear")
     return rows
   }
@@ -97,6 +99,7 @@ Panel {
     else if (name === "ca") pods.setConversationalAwareness(!pods.conversationalAwareness)
     else if (name === "mic") pods.setHiResMic(!pods.hiResMicEnabled)
     else if (name === "onebud") pods.setOneBudANC(!pods.oneBudANC)
+    else if (name === "codec") pods.toggleCodec()
     else if (name === "ear") pods.cycleEarDetection()
   }
 
@@ -367,10 +370,20 @@ Panel {
             spacing: Style.space(6)
 
             ValueRow {
+              visible: root.codecVisible
+              width: parent.width
+              rowName: "codec"
+              label: "Codec"
+              value: pods.codec === "AAC" ? "AAC, steadier mic" : "SBC-XQ, for music"
+              onActivated: pods.toggleCodec()
+            }
+
+            ValueRow {
               width: parent.width
               rowName: "ear"
               label: "Ear detection"
               value: Model.earDetectionName(pods.earDetectionBehavior)
+              onActivated: pods.cycleEarDetection()
             }
           }
 
@@ -604,6 +617,7 @@ Panel {
     property string rowName: ""
     property string label: ""
     property string value: ""
+    signal activated()
 
     hasCursor: root.rowHasCursor(rowName)
     foreground: root.foreground
@@ -614,7 +628,7 @@ Panel {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onEntered: root.focusRow(valueRow.rowName)
-      onClicked: pods.cycleEarDetection()
+      onClicked: valueRow.activated()
     }
 
     RowLayout {

@@ -143,6 +143,8 @@ public:
         // Load settings
         CrossDevice.isEnabled = loadCrossDeviceEnabled();
         setEarDetectionBehavior(loadEarDetectionSettings());
+        m_chosenCodec = m_settings->value("audio/codec", "SBC-XQ").toString();
+        mediaController->setChosenCodec(m_chosenCodec);
         m_hiResMicEnabled = m_settings->value("hiresMic/enabled", true).toBool();
         m_hiResClock.start();
         loadHiResParked();
@@ -1152,6 +1154,17 @@ public slots:
         saveEarDetectionSettings();
         ++m_earDetectionChangesTotal;
         emit earDetectionBehaviorChanged(behavior);
+    }
+
+    // "SBC-XQ" or "AAC". AAC leaves the hi-res mic more of the link; the user picks, nothing else does.
+    void setChosenCodec(const QString &codec)
+    {
+        m_chosenCodec = codec;
+        m_settings->setValue("audio/codec", codec);
+        mediaController->setChosenCodec(codec);
+        if (areAirpodsConnected() && m_deviceInfo && !m_deviceInfo->bluetoothAddress().isEmpty()) {
+            mediaController->activateA2dpProfileWithRetry(m_deviceInfo->bluetoothAddress().replace(":", "_"));
+        }
     }
 
     void setCrossDeviceEnabled(bool enabled)
@@ -2228,6 +2241,7 @@ signals:
 private:
     HiResMic m_hiResMic;
     bool m_hiResMicEnabled = true;
+    QString m_chosenCodec = "SBC-XQ";
     QTimer *m_hiResMonitor = nullptr;
     bool m_hiResMicArmed = false;
     quint64 m_hiResSdus = 0;
@@ -2341,6 +2355,7 @@ public:
         status.insert("connected", areAirpodsConnected());
         status.insert("device_name", d ? d->deviceName() : QString());
         status.insert("noise_mode", d ? d->noiseControlModeInt() : -1);
+        status.insert("codec", m_chosenCodec);
         if (b) {
             auto pod = [&](bool avail, int level, bool charging, bool inEar) {
                 QJsonObject o;
@@ -2732,6 +2747,10 @@ int main(int argc, char *argv[]) {
                 trayAppPtr->setNoiseControlModeInt(2);
             } else if (msg == "noise:adaptive") {
                 trayAppPtr->setNoiseControlModeInt(3);
+            } else if (msg == "codec:sbc-xq") {
+                trayAppPtr->setChosenCodec("SBC-XQ");
+            } else if (msg == "codec:aac") {
+                trayAppPtr->setChosenCodec("AAC");
             } else if (msg == "noise:cycle") {
                 trayAppPtr->cycleNoiseControlMode();
             } else if (msg == "ear:off") {

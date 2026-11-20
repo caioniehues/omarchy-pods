@@ -105,10 +105,16 @@ empty surface.
 
 ### The output codec, and what the microphone costs
 
-The daemon always selects the highest-bitrate playback profile the card offers,
-which is SBC-XQ at 453 kbps ahead of SBC at 328 and AAC at 256. That is the
-default, and it is re-applied every time the daemon activates the card, because
-PipeWire's own profile priority puts AAC first and would otherwise win.
+By default the daemon selects the highest-bitrate playback profile the card
+offers, which is SBC-XQ at 453 kbps ahead of SBC at 328 and AAC at 256. The
+panel's Codec row switches to AAC instead. The choice is kept across restarts and
+re-applied every time the daemon activates the card, because PipeWire's own
+profile priority puts AAC first and would otherwise win.
+
+AAC is the one to pick when you use the AirPods microphone with music playing.
+On an AirPods Pro 3, SBC-XQ sent 517 kbit/s to the AirPods against AAC's 256, and
+in one of two 60 s runs the microphone lost about 240 ms of audio in three gaps;
+AAC lost none. A blind ABX of the two on the same AirPods scored 6 of 12, chance.
 
 Selecting the AirPods as a **microphone** gives that up. Over the standard
 Bluetooth profiles, two-way voice runs on a separate low-bandwidth channel, so

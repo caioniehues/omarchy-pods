@@ -17,6 +17,8 @@ private slots:
     void readsTheCodecOutOfAProfileDescription();
     void readsTheCodecOutOfTheProfileNameToo();
     void refusesEveryHeadsetProfileByName();
+    void theChosenCodecWinsOverBitrate();
+    void anUnofferedChoiceFallsBackToBitrate();
 };
 
 static QVector<ProfileCandidate> airPodsCard()
@@ -163,6 +165,19 @@ void TestProfileChoice::refusesEveryHeadsetProfileByName()
     QVERIFY(!isHeadsetProfile("a2dp-sink-sbc_xq"));
     QVERIFY(!isHeadsetProfile("a2dp-sink"));
     QVERIFY(!isHeadsetProfile("off"));
+}
+
+void TestProfileChoice::theChosenCodecWinsOverBitrate()
+{
+    QCOMPARE(bestPlaybackProfile(airPodsCard(), "AAC"), QString("a2dp-sink"));
+    QCOMPARE(bestPlaybackProfile(airPodsCard(), "SBC-XQ"), QString("a2dp-sink-sbc_xq"));
+}
+
+void TestProfileChoice::anUnofferedChoiceFallsBackToBitrate()
+{
+    QVector<ProfileCandidate> noAac = airPodsCard();
+    noAac.removeIf([](const ProfileCandidate &c) { return c.name == "a2dp-sink"; });
+    QCOMPARE(bestPlaybackProfile(noAac, "AAC"), QString("a2dp-sink-sbc_xq"));
 }
 
 QTEST_GUILESS_MAIN(TestProfileChoice)

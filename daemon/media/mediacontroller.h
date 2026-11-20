@@ -43,6 +43,8 @@ public:
   void setConnectedDeviceMacAddress(const QString &macAddress);
   bool isA2dpProfileAvailable();
   QString getPreferredA2dpProfile();
+  // "SBC-XQ" or "AAC"; the next activation applies it.
+  void setChosenCodec(const QString &codec);
   QString getActiveProfile();
   bool restartWirePlumber();
 
@@ -80,6 +82,7 @@ private:
   PlayerStatusWatcher *playerStatusWatcher = nullptr;
   PulseAudioController *m_pulseAudio = nullptr;
   QString m_cachedA2dpProfile;
+  QString m_chosenCodec = "SBC-XQ";
   quint64 m_earDetectionGeneration = 0;
   bool m_earOutPending = false;
   // A queued retry compares its captured generation against this, so a superseded chain stops.

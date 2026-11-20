@@ -3,7 +3,7 @@
 
 const source = Deno.readTextFileSync(new URL("../Model.js", import.meta.url))
 const Model = new Function(
-  source + "; return { parseStatus, podFrom, defaultPod, noiseModeVerb, earDetectionVerb, levelFraction, levelText, podMeta, elideError, availableModes, NOISE_OFF, NOISE_ANC, NOISE_TRANSPARENCY, NOISE_ADAPTIVE, LEVEL_UNKNOWN, NOISE_UNKNOWN, EAR_PAUSE_ONE_OUT, LID_UNKNOWN, MAX_ERROR_CHARS, MAX_STATUS_BYTES }"
+  source + "; return { parseStatus, podFrom, defaultPod, noiseModeVerb, earDetectionVerb, codecVerb, levelFraction, levelText, podMeta, elideError, availableModes, NOISE_OFF, NOISE_ANC, NOISE_TRANSPARENCY, NOISE_ADAPTIVE, LEVEL_UNKNOWN, NOISE_UNKNOWN, EAR_PAUSE_ONE_OUT, LID_UNKNOWN, MAX_ERROR_CHARS, MAX_STATUS_BYTES }"
 )()
 
 let failures = 0
@@ -51,6 +51,11 @@ check("fresh line parses", fresh.ok, true)
 check("fresh left is the default pod", fresh.left, Model.defaultPod())
 check("fresh case is unknown", fresh.caseBattery.level, Model.LEVEL_UNKNOWN)
 check("supports_noise_off absent means the model has Off", fresh.supportsNoiseOff, true)
+check("codec absent reads as empty, which hides the row", fresh.codec, "")
+check("codec is read as the daemon wrote it", Model.parseStatus('{"codec":"AAC","schema_version":1}').codec, "AAC")
+check("codec verb for SBC-XQ", Model.codecVerb("SBC-XQ"), "codec:sbc-xq")
+check("codec verb for AAC", Model.codecVerb("AAC"), "codec:aac")
+check("codec verb for anything else is empty", Model.codecVerb("SBC"), "")
 
 // available:false means the daemon stopped hearing from the pod, so no flag survives.
 const gone = Model.podFrom({ available: false, level: 82, charging: true, in_ear: true })

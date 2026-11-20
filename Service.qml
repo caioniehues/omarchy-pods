@@ -20,6 +20,7 @@ Item {
   property bool supportsConversationalAwareness: false
   property bool supportsOneBudANC: false
   property int noiseMode: Model.NOISE_UNKNOWN
+  property string codec: ""
   property int adaptiveNoiseLevel: 0
   property bool oneBudANC: false
   property bool conversationalAwareness: false
@@ -121,6 +122,7 @@ Item {
     lidState = status.lidState
 
     noiseMode = _settle("noiseMode", status.noiseMode)
+    codec = _settle("codec", status.codec)
     adaptiveNoiseLevel = _settle("adaptiveNoiseLevel", status.adaptiveNoiseLevel)
     oneBudANC = _settle("oneBudANC", status.oneBudANC)
     conversationalAwareness = _settle("conversationalAwareness", status.conversationalAwareness)
@@ -202,6 +204,11 @@ Item {
 
   function setEarDetectionBehavior(behavior) {
     _send(Model.earDetectionVerb(behavior), "earDetectionBehavior", behavior)
+  }
+
+  function toggleCodec() {
+    var next = codec === "AAC" ? "SBC-XQ" : "AAC"
+    _send(Model.codecVerb(next), "codec", next)
   }
 
   function cycleEarDetection() {

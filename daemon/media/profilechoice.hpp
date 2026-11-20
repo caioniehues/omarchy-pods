@@ -68,9 +68,11 @@ inline QString profileDescription(const QVector<ProfileCandidate> &candidates, c
 }
 
 // A profile carrying a source is the headset mic path, never the playback one.
-inline QString bestPlaybackProfile(const QVector<ProfileCandidate> &candidates)
+// The user's chosen codec wins when the card offers it; otherwise the highest bitrate does.
+inline QString bestPlaybackProfile(const QVector<ProfileCandidate> &candidates, const QString &chosenCodec = QString())
 {
     QString best;
+    bool bestChosen = false;
     int bestBitrate = -1;
     int bestPriority = -1;
     for (const ProfileCandidate &c : candidates) {
@@ -78,11 +80,15 @@ inline QString bestPlaybackProfile(const QVector<ProfileCandidate> &candidates)
             continue;
         }
         // The name survives a translated locale, so it is tried first and the description backs it up.
-        int bitrate = codecBitrateKbps(codecFromProfileName(c.name));
-        if (bitrate == 0) {
-            bitrate = codecBitrateKbps(codecFromDescription(c.description));
+        QString codec = codecFromProfileName(c.name);
+        if (codecBitrateKbps(codec) == 0) {
+            codec = codecFromDescription(c.description);
         }
-        if (bitrate > bestBitrate || (bitrate == bestBitrate && c.priority > bestPriority)) {
+        const int bitrate = codecBitrateKbps(codec);
+        const bool chosen = !chosenCodec.isEmpty() && codec == chosenCodec;
+        if (chosen != bestChosen ? chosen
+                : (bitrate > bestBitrate || (bitrate == bestBitrate && c.priority > bestPriority))) {
+            bestChosen = chosen;
             bestBitrate = bitrate;
             bestPriority = c.priority;
             best = c.name;

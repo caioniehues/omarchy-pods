@@ -57,6 +57,7 @@ function defaultStatus() {
     supportsConversationalAwareness: false,
     supportsOneBudANC: false,
     noiseMode: NOISE_UNKNOWN,
+    codec: "",
     adaptiveNoiseLevel: 0,
     oneBudANC: false,
     conversationalAwareness: false,
@@ -156,6 +157,8 @@ function parseStatus(raw) {
   status.supportsConversationalAwareness = boolOr(parsed.supports_conversational_awareness, status.isProSeries)
   status.supportsOneBudANC = boolOr(parsed.supports_one_bud_anc, status.isProSeries)
   status.noiseMode = intOr(parsed.noise_mode, NOISE_UNKNOWN)
+  // A daemon older than the codec choice sends none, and the panel then hides the row.
+  status.codec = typeof parsed.codec === "string" ? parsed.codec : ""
   status.adaptiveNoiseLevel = intOr(parsed.adaptive_noise_level, 0)
   status.oneBudANC = parsed.one_bud_anc_mode === true
   status.conversationalAwareness = parsed.conversational_awareness === true
@@ -199,6 +202,13 @@ function noiseModeVerb(mode) {
   var verbs = ["noise:off", "noise:anc", "noise:transparency", "noise:adaptive"]
   if (mode < 0 || mode >= verbs.length) return ""
   return verbs[mode]
+}
+
+// The two codecs the user may choose; plain SBC is only ever the daemon's fallback.
+function codecVerb(codec) {
+  if (codec === "SBC-XQ") return "codec:sbc-xq"
+  if (codec === "AAC") return "codec:aac"
+  return ""
 }
 
 function earDetectionVerb(behavior) {

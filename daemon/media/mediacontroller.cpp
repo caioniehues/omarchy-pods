@@ -271,6 +271,11 @@ bool MediaController::isA2dpProfileAvailable() {
   return !getPreferredA2dpProfile().isEmpty();
 }
 
+void MediaController::setChosenCodec(const QString &codec) {
+  m_chosenCodec = codec;
+  m_cachedA2dpProfile.clear();
+}
+
 QString MediaController::getPreferredA2dpProfile() {
   if (m_deviceOutputName.isEmpty()) {
     return QString();
@@ -282,10 +287,10 @@ QString MediaController::getPreferredA2dpProfile() {
   }
 
   const QVector<ProfileCandidate> profiles = m_pulseAudio->getCardProfiles(m_deviceOutputName);
-  m_cachedA2dpProfile = bestPlaybackProfile(profiles);
+  m_cachedA2dpProfile = bestPlaybackProfile(profiles, m_chosenCodec);
   if (!m_cachedA2dpProfile.isEmpty()) {
     // The profile name hides the codec: AAC is the bare `a2dp-sink` on this stack.
-    LOG_INFO("Selected best available output profile: " << m_cachedA2dpProfile
+    LOG_INFO("Selected output profile for codec " << m_chosenCodec << ": " << m_cachedA2dpProfile
              << " (" << profileDescription(profiles, m_cachedA2dpProfile) << ")");
   }
   return m_cachedA2dpProfile;

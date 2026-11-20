@@ -37,6 +37,7 @@ does not use it, and runs `librepods-ctl` only for the control verbs below.
 | `connected` | bool | the L2CAP audio link, not whether the daemon is up |
 | `device_name` | string | the BlueZ alias |
 | `noise_mode` | int | 0 Off, 1 Noise Cancellation, 2 Transparency, 3 Adaptive, -1 unknown |
+| `codec` | string | the user's codec choice, `SBC-XQ` or `AAC`; the card falls back to the highest bitrate when it lacks that one |
 | `left`, `right` | object | `{available, level, charging, in_ear}` |
 | `case` | object | `{available, level, charging}`, no `in_ear` |
 | `conversational_awareness` | bool | Pro only |
@@ -98,7 +99,7 @@ battery section on any known level and the control sections on `connected`.
 
 `noise:off`, `noise:anc`, `noise:transparency`, `noise:adaptive`,
 `ear:one`, `ear:both`, `ear:off`, `ca:on`, `ca:off`, `onebud:on`,
-`onebud:off`, `adaptive:N` for N in 0-100.
+`onebud:off`, `adaptive:N` for N in 0-100, `codec:sbc-xq`, `codec:aac`.
 
 The daemon also offers `connect`, `disconnect` and `forget`, which shell out to
 `bluetoothctl`. The panel does not use them: `omarchy bluetooth device` and the

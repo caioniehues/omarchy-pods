@@ -47,12 +47,13 @@ Two traps that have cost real time here:
 
 ## The output codec is not negotiable
 
-The daemon selects the highest-bitrate playback profile the card offers, SBC-XQ at
-453 kbps ahead of SBC at 328 and AAC at 256, and re-applies it on every activation
-because PipeWire's priority order puts AAC first. A change that lowers the selected
-bitrate is a defect here even when it reads as a simplification, and a guard that
-quietly skips the selection is the same defect in a different costume. One of those
-has already shipped and been reverted.
+By default the daemon selects the highest-bitrate playback profile the card offers,
+SBC-XQ at 453 kbps ahead of SBC at 328 and AAC at 256, and re-applies it on every
+activation because PipeWire's priority order puts AAC first. The one way to AAC is
+the user picking it in the panel's Codec row. A change that lowers the selected
+bitrate on its own is a defect here even when it reads as a simplification, and a
+guard that quietly skips the selection is the same defect in a different costume.
+One of those has already shipped and been reverted.
 
 Over the standard Bluetooth profiles a card cannot expose a high-quality sink and a
 microphone at once: the only profiles carrying a source are 16 kHz mSBC and 8 kHz
