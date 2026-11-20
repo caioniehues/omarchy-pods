@@ -22,11 +22,8 @@ int reconnectDelayMs(int attempt)
     return reconnectBaseDelayMs * (1 << (boundedAttempt - 1));
 }
 
-// pa_threaded_mainloop_wait() returns only once something signals the mainloop, and the
-// only thing signalling ours is a context state change. A server that accepts the socket
-// and then stalls never produces one, so a bare wait parks the caller forever and the
-// deadline below never gets re-checked. Arming a mainloop time event guarantees the one
-// wakeup the loop needs to notice it has run out of time.
+// Only a context state change signals the mainloop, and a server that accepts then stalls sends none,
+// so this time event is the one wakeup that lets the readiness wait see its deadline.
 class MainloopWakeup
 {
 public:
@@ -39,8 +36,7 @@ public:
         m_event = m_api->time_new(m_api, &tv, &MainloopWakeup::fire, mainloop);
     }
 
-    // Must run with the mainloop lock still held, which is why the readiness wait is its
-    // own function: every caller unlocks after this goes out of scope, never before.
+    // Runs with the mainloop lock held, because every caller unlocks only after the readiness wait returns.
     ~MainloopWakeup()
     {
         if (m_event) m_api->time_free(m_event);
@@ -257,10 +253,8 @@ void PulseAudioController::attemptReconnect()
         m_context, PA_SUBSCRIPTION_MASK_SINK, nullptr, nullptr);
     if (subOp) pa_operation_unref(subOp);
 
-    // Both set under the lock, for the same reason as in initialize(): releasing first
-    // leaves a window where a dying context queues scheduleReconnect(), this assignment
-    // then re-marks the controller initialized, and the queued call bails on its guard --
-    // stranding a dead context with no retry pending.
+    // Set under the lock as in initialize(): otherwise a context dying in between queues a reconnect
+    // that then bails on m_initialized, leaving a dead context with no retry pending.
     m_initialized = true;
     m_reconnectAttempts = 0;
     pa_threaded_mainloop_unlock(m_mainloop);
