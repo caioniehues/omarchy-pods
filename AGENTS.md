@@ -17,6 +17,10 @@ cmake --build build
 ctest --test-dir build
 ```
 
+On the fork's `build` branch, `.githooks/` runs these, `tests/model.test.js`, gitleaks and the
+em dash check on every commit; link it once per clone with
+`ln -s ../../.githooks/pre-commit ../../.githooks/commit-msg .git/hooks/`.
+
 Two traps that have cost real time here:
 
 - `daemon/tests/CMakeLists.txt` links only `Qt6::Test` and `Qt6::Core`, so a test

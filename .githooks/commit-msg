@@ -1,0 +1,10 @@
+#!/bin/bash
+# CONTRIBUTING.md bans em dashes and AI attribution in commit messages.
+msg=$(rg -v '^#' "$1")
+if printf '%s\n' "$msg" | rg -q '\x{2014}'; then
+  echo "commit-msg: em dash in the message; use commas, parentheses or a rewrite." >&2; exit 1
+fi
+if printf '%s\n' "$msg" | rg -qi '^co-authored-by:.*(claude|anthropic|copilot|codex|gpt)|generated with'; then
+  echo "commit-msg: AI attribution in the message (AGENTS.md)." >&2; exit 1
+fi
+exit 0

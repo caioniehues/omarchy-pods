@@ -1,0 +1,19 @@
+# Fork-only: the same suites as .githooks/pre-commit, on the packages setup installs.
+name: check
+on:
+  push:
+    branches: [build]
+  pull_request:
+    branches: [build]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - run: pacman -Syu --noconfirm --needed git base-devel cmake ninja qt6-connectivity qt6-tools qt6-declarative pkgconf libpulse deno
+      - uses: actions/checkout@v4
+      - run: cmake -S daemon -B daemon/build -G Ninja && cmake --build daemon/build
+      - run: ctest --test-dir daemon/build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - run: deno run --allow-read tests/model.test.js
