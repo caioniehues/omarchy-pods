@@ -94,6 +94,7 @@ BleManager::BleManager(QObject *parent) : QObject(parent)
     discoveryAgent->setLowEnergyDiscoveryTimeout(ScanDuty::scanWindowMs);
 
     idleTimer = new QTimer(this);
+    idleTimer->setObjectName(QStringLiteral("bleScanIdle"));
     idleTimer->setSingleShot(true);
     connect(idleTimer, &QTimer::timeout, this, &BleManager::onIdleFinished);
 

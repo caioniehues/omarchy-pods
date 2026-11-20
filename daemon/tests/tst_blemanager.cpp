@@ -95,6 +95,16 @@ static QTimer *retryTimerOf(BleManager &manager)
     return manager.findChild<QTimer *>(QStringLiteral("bleScanRetry"), Qt::FindDirectChildrenOnly);
 }
 
+static QTimer *idleTimerOf(BleManager &manager)
+{
+    return manager.findChild<QTimer *>(QStringLiteral("bleScanIdle"), Qt::FindDirectChildrenOnly);
+}
+
+static void finishWindow(BleManager &manager)
+{
+    QMetaObject::invokeMethod(&manager, "onScanFinished", Qt::DirectConnection);
+}
+
 class TestBleManager : public QObject
 {
     Q_OBJECT
@@ -109,6 +119,7 @@ private slots:
     void advertisementResetsTheRetryLadder();
     void stoppedScanIsNotRestartedByAFailure();
     void adapterPowerOnRestartsAWantedScan();
+    void finishedWindowArmsTheGapUntilStopped();
 };
 
 void TestBleManager::unparseableFrameIsDropped_data()
@@ -255,6 +266,25 @@ void TestBleManager::adapterPowerOnRestartsAWantedScan()
     manager.stopScan();
     powerAdapterOn(manager);
     QVERIFY(!manager.isScanning());
+}
+
+// Without the gap timer the scan never resumes after its first window.
+void TestBleManager::finishedWindowArmsTheGapUntilStopped()
+{
+    BleManager manager;
+    QTimer *idle = idleTimerOf(manager);
+    QVERIFY(idle);
+
+    manager.startScan();
+    finishWindow(manager);
+    QVERIFY(idle->isActive());
+    QCOMPARE(idle->interval(), ScanDuty::idleWindowMs);
+    QVERIFY(manager.isScanning());
+
+    manager.stopScan();
+    QVERIFY(!idle->isActive());
+    finishWindow(manager);
+    QVERIFY(!idle->isActive());
 }
 
 QTEST_GUILESS_MAIN(TestBleManager)
