@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
-      - run: pacman -Syu --noconfirm --needed git base-devel cmake ninja qt6-connectivity qt6-tools qt6-declarative pkgconf libpulse deno
+      - run: pacman -Syu --noconfirm --needed git base-devel deno
       - uses: actions/checkout@v4
+      # Read from setup, so CI builds against exactly what a user's install gets.
+      - run: pacman -S --noconfirm --needed $(sed -n 's/^omarchy pkg add //p' setup)
       - run: cmake -S daemon -B daemon/build -G Ninja && cmake --build daemon/build
       - run: ctest --test-dir daemon/build --output-on-failure
         env:
