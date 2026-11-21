@@ -145,6 +145,8 @@ Item {
       borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(1)))
       opacity: 0
 
+      MouseArea { anchors.fill: parent; onClicked: root.close() }
+
       ColumnLayout {
         anchors.fill: parent
         anchors.margins: Style.space(24)
