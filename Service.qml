@@ -7,6 +7,7 @@ Item {
   id: root
 
   property var settings: ({})
+  signal statusUpdated()
 
   property bool daemonReachable: false
   property bool connected: false
@@ -131,6 +132,7 @@ Item {
     // Reported by the daemon as the stream starts and stops, so it is never optimistic.
     hiResMicActive = status.hiResMicActive
     earDetectionBehavior = _settle("earDetectionBehavior", status.earDetectionBehavior)
+    statusUpdated()
   }
 
   function _settle(field, reported) {

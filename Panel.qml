@@ -6,12 +6,48 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "ConnectionEvents.js" as ConnectionEvents
 
 Panel {
   id: root
   moduleName: "io.github.thisisgm.omapods"
   ipcTarget: "omapods"
   manageIpc: false
+
+  property var connectionEvents: ConnectionEvents.newState()
+
+  // The first widget shows the card, so a plugin on several bars opens one.
+  function ownsConnectionCard() {
+    if (!root.bar) return true
+    var widgets = root.bar.moduleWidgets(root.moduleName)
+    return widgets.length === 0 || widgets[0] === root
+  }
+
+  function showConnectionCard(demo) {
+    connectionCard.active = false
+    connectionCard.setSource("ConnectionCard.qml", { pods: pods, previewOnly: demo })
+    connectionCard.active = true
+  }
+
+  Loader {
+    id: connectionCard
+    active: false
+  }
+  Connections {
+    target: connectionCard.item
+    function onDismissed() { connectionCard.active = false }
+  }
+  Connections {
+    target: pods
+    function onStatusUpdated() {
+      if (ConnectionEvents.shouldShow(root.connectionEvents, pods.lidState, Date.now()) && root.ownsConnectionCard())
+        root.showConnectionCard(false)
+      if (!pods.connected && pods.lidState !== Model.LID_OPEN) connectionCard.active = false
+    }
+    function onDaemonReachableChanged() {
+      if (!pods.daemonReachable) connectionCard.active = false
+    }
+  }
 
   property int cursorIndex: 0
   property bool cursorActive: false
