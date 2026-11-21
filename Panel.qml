@@ -42,7 +42,9 @@ Panel {
     function onStatusUpdated() {
       if (ConnectionEvents.shouldShow(root.connectionEvents, pods.lidState, Date.now()) && root.ownsConnectionCard())
         root.showConnectionCard(false)
-      if (!pods.connected && pods.lidState !== Model.LID_OPEN) connectionCard.active = false
+      // A demo has no AirPods behind it, so a status write must not close it.
+      if (!pods.connected && pods.lidState !== Model.LID_OPEN && !(connectionCard.item && connectionCard.item.previewOnly))
+        connectionCard.active = false
     }
     function onDaemonReachableChanged() {
       if (!pods.daemonReachable) connectionCard.active = false
