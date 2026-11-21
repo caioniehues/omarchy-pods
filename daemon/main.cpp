@@ -984,10 +984,7 @@ public slots:
         setNoiseControlMode(static_cast<NoiseControlMode>(mode));
     }
 
-    // Walk every battery source on each battery-status change and let
-    // its LowBatteryWatcher decide; format and emit the toast here. The
-    // global notificationsEnabled setting still gates emission via
-    // Notifier::notify.
+    // notificationsEnabled still gates emission inside Notifier::notify.
     void checkLowBatteryThresholds()
     {
         if (!m_deviceInfo) return;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QtGlobal>
+#include <iterator>
 #include <optional>
 
 struct LowBatteryAlert {
@@ -22,7 +23,7 @@ public:
             return std::nullopt;
         }
         int crossed = 0;
-        while (crossed < 3 && level <= stages[crossed]) ++crossed;
+        while (crossed < int(std::size(stages)) && level <= stages[crossed]) ++crossed;
         if (crossed <= m_stagesDone) return std::nullopt;
         m_stagesDone = crossed;
         return LowBatteryAlert{stages[crossed - 1], level};
