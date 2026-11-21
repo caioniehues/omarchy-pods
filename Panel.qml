@@ -169,6 +169,12 @@ Panel {
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { pods.refresh(); return "ok" }
+    function card(): string {
+      if (!pods.hasAirPods && pods.lidState !== Model.LID_OPEN) return "Connect AirPods or open their case first"
+      root.showConnectionCard(false)
+      return "ok"
+    }
+    function cardDemo(): string { root.showConnectionCard(true); return "ok" }
     function noise(): string { pods.cycleNoiseMode(); return "ok" }
     function status(): string { return Model.noiseModeName(pods.noiseMode) }
   }
