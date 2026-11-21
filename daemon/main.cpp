@@ -1,4 +1,5 @@
 #include <QSettings>
+#include <sys/stat.h>
 #include <QLocalServer>
 #include <QSaveFile>
 #include <QFileInfo>
@@ -75,7 +76,7 @@ class AirPodsTrayApp : public QObject {
 
 public:
     AirPodsTrayApp(bool debugMode, bool hideOnStart, bool headless, QQmlApplicationEngine *parent = nullptr)
-        : QObject(parent), debugMode(debugMode), m_settings(new QSettings("AirPodsTrayApp", "AirPodsTrayApp"))
+        : QObject(parent), debugMode(debugMode), m_settings(new QSettings("AirPodsTrayApp", "AirPodsTrayApp", this))
         , m_autoStartManager(new AutoStartManager(this)), m_hideOnStart(hideOnStart), parent(parent)
         , m_deviceInfo(new DeviceInfo(this)), m_bleManager(new BleManager(this))
         , m_systemSleepMonitor(new SystemSleepMonitor(this)), m_notifier(new Notifier(this))
@@ -2478,6 +2479,8 @@ private:
 };
 
 int main(int argc, char *argv[]) {
+    // Everything the daemon creates (settings, status file, socket directory entries) is for the user alone.
+    umask(077);
     // Read before the application object exists, because --headless decides which class to construct.
     bool debugMode = false;
     bool hideOnStart = false;
@@ -2697,8 +2700,11 @@ int main(int argc, char *argv[]) {
 
     if (!server.listen(ipcPath))
     {
-        LOG_ERROR("Unable to start the listening server");
-        LOG_DEBUG("Server error: " << server.errorString());
+        LOG_ERROR("Unable to start the listening server: " << server.errorString());
+        // An absent state file is how a watcher learns the daemon stopped, and this also clears one an earlier run left.
+        QFile::remove(QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
+                      + QStringLiteral("/librepods/status.json"));
+        return 1;
     }
     else
     {
