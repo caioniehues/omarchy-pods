@@ -15,7 +15,7 @@ Item {
   property bool previewOnly: false
   signal dismissed()
   readonly property int displayMs: animateModel ? 9800 : 5000
-  readonly property int transitionMs: animateModel ? 250 : 0
+  readonly property int transitionMs: animateModel ? Style.duration(250) : 0
   readonly property bool showProModel: previewOnly || (pods && pods.isProSeries === true)
   readonly property int animationEnd: 8500
   readonly property int lowBatteryPercent: 20
@@ -217,7 +217,7 @@ Item {
               property: "animationFrame"
               from: 0
               to: root.animationEnd
-              duration: root.animationEnd
+              duration: Style.duration(root.animationEnd)
             }
           }
           AirPodsIcon {

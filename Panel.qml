@@ -23,9 +23,12 @@ Panel {
     return widgets.length === 0 || widgets[0] === root
   }
 
+  readonly property bool showCardOnOpen: setting("showConnectionCard", true) === true
+
+  // The card follows Omarchy's animations switch (Style.reduceMotion), read when it opens.
   function showConnectionCard(demo) {
     connectionCard.active = false
-    connectionCard.setSource("ConnectionCard.qml", { pods: pods, previewOnly: demo })
+    connectionCard.setSource("ConnectionCard.qml", { pods: pods, previewOnly: demo, animateModel: !Style.reduceMotion })
     connectionCard.active = true
   }
 
@@ -40,7 +43,7 @@ Panel {
   Connections {
     target: pods
     function onStatusUpdated() {
-      if (ConnectionEvents.shouldShow(root.connectionEvents, pods.lidState, Date.now()) && root.ownsConnectionCard())
+      if (ConnectionEvents.shouldShow(root.connectionEvents, pods.lidState, Date.now()) && root.ownsConnectionCard() && root.showCardOnOpen)
         root.showConnectionCard(false)
       // A demo has no AirPods behind it, so a status write must not close it.
       if (!pods.connected && pods.lidState !== Model.LID_OPEN && !(connectionCard.item && connectionCard.item.previewOnly))
@@ -171,6 +174,7 @@ Panel {
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { pods.refresh(); return "ok" }
+    // card and cardDemo are explicit commands, so the setting gates only the case-open trigger.
     function card(): string {
       if (!pods.hasAirPods && pods.lidState !== Model.LID_OPEN) return "Connect AirPods or open their case first"
       root.showConnectionCard(false)

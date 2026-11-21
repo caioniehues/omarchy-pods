@@ -20,6 +20,7 @@
     "defaultSection": "right",
     "defaults": {
       "hideWhenDisconnected": true,
+      "showConnectionCard": true,
       "ctlPath": ""
     },
     "schema": [
@@ -27,6 +28,12 @@
         "key": "hideWhenDisconnected",
         "type": "boolean",
         "label": "Hide the icon when no AirPods are connected",
+        "defaultValue": true
+      },
+      {
+        "key": "showConnectionCard",
+        "type": "boolean",
+        "label": "Show the Connection card when the case opens",
         "defaultValue": true
       },
       {
