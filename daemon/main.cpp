@@ -2705,8 +2705,11 @@ int main(int argc, char *argv[]) {
 
     if (!server.listen(ipcPath))
     {
-        LOG_ERROR("Unable to start the listening server");
-        LOG_DEBUG("Server error: " << server.errorString());
+        LOG_ERROR("Unable to start the listening server: " << server.errorString());
+        // An absent state file is how a watcher learns the daemon stopped, and this also clears one an earlier run left.
+        QFile::remove(QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
+                      + QStringLiteral("/librepods/status.json"));
+        return 1;
     }
     else
     {
