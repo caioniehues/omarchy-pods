@@ -1,4 +1,5 @@
 #include <QSettings>
+#include <sys/stat.h>
 #include <QLocalServer>
 #include <QSaveFile>
 #include <QFileInfo>
@@ -60,6 +61,12 @@ using namespace AirpodsTrayApp::Enums;
 // Users filter via QT_LOGGING_RULES with `openpods.*`.
 Q_LOGGING_CATEGORY(openpods, "openpods")
 
+static QString statusFilePath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
+        + QStringLiteral("/librepods/status.json");
+}
+
 class AirPodsTrayApp : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool airpodsConnected READ areAirpodsConnected NOTIFY airPodsStatusChanged)
@@ -75,7 +82,7 @@ class AirPodsTrayApp : public QObject {
 
 public:
     AirPodsTrayApp(bool debugMode, bool hideOnStart, bool headless, QQmlApplicationEngine *parent = nullptr)
-        : QObject(parent), debugMode(debugMode), m_settings(new QSettings("AirPodsTrayApp", "AirPodsTrayApp"))
+        : QObject(parent), debugMode(debugMode), m_settings(new QSettings("AirPodsTrayApp", "AirPodsTrayApp", this))
         , m_autoStartManager(new AutoStartManager(this)), m_hideOnStart(hideOnStart), parent(parent)
         , m_deviceInfo(new DeviceInfo(this)), m_bleManager(new BleManager(this))
         , m_systemSleepMonitor(new SystemSleepMonitor(this)), m_notifier(new Notifier(this))
@@ -984,11 +991,7 @@ public slots:
         setNoiseControlMode(static_cast<NoiseControlMode>(mode));
     }
 
-    // Walk every battery source on each battery-status change and
-    // delegate the trip/reset decision to its LowBatteryLatch. Format
-    // + emit the user-visible toast here; the latch owns no UI. The
-    // global notificationsEnabled setting still gates emission via
-    // Notifier::notify.
+    // notificationsEnabled still gates emission inside Notifier::notify.
     void checkLowBatteryThresholds()
     {
         if (!m_deviceInfo) return;
@@ -1000,24 +1003,24 @@ public slots:
             quint8 level;
             bool available;
             bool charging;
-            LowBatteryLatch *latch;
+            LowBatteryWatcher *watcher;
         };
         const Source sources[] = {
             { "Left",  b->getLeftPodLevel(),  b->isLeftPodAvailable(),
-              b->isLeftPodCharging(),  &m_lowBatteryLatchLeft },
+              b->isLeftPodCharging(),  &m_lowBatteryWatcherLeft },
             { "Right", b->getRightPodLevel(), b->isRightPodAvailable(),
-              b->isRightPodCharging(), &m_lowBatteryLatchRight },
+              b->isRightPodCharging(), &m_lowBatteryWatcherRight },
             { "Case",  b->getCaseLevel(),     b->isCaseAvailable(),
-              b->isCaseCharging(),     &m_lowBatteryLatchCase },
+              b->isCaseCharging(),     &m_lowBatteryWatcherCase },
         };
 
         for (const Source &s : sources)
         {
-            const auto fire = s.latch->evaluate(s.level, s.available, s.charging);
-            if (fire) {
+            const auto alert = s.watcher->evaluate(s.level, s.available, s.charging);
+            if (alert) {
                 m_notifier->notify(
                     tr("%1 AirPod Low Battery").arg(QString::fromLatin1(s.label)),
-                    tr("%1% remaining").arg(*fire));
+                    tr("%1% remaining").arg(alert->level));
             }
         }
     }
@@ -2326,14 +2329,10 @@ private:
     int m_oneBudANCChangesTotal = 0;
     int m_reopenCallsTotal = 0;
 
-    // Low-battery notification latches per battery source. State +
-    // hysteresis live in LowBatteryLatch (see lowbatterywatcher.hpp);
-    // tst_lowbatterywatcher.cpp exhaustively covers the trip/reset
-    // transitions so this slot only needs to feed the three sources
-    // through their respective latches and format the message.
-    LowBatteryLatch m_lowBatteryLatchLeft;
-    LowBatteryLatch m_lowBatteryLatchRight;
-    LowBatteryLatch m_lowBatteryLatchCase;
+    // One staged watcher per battery source; see lowbatterywatcher.hpp.
+    LowBatteryWatcher m_lowBatteryWatcherLeft;
+    LowBatteryWatcher m_lowBatteryWatcherRight;
+    LowBatteryWatcher m_lowBatteryWatcherCase;
 
 public:
     int reconnectAttemptsTotal() const { return m_reconnectAttemptsTotal; }
@@ -2449,13 +2448,12 @@ public:
         if (line == m_lastState) {
             return;
         }
-        const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
-            + QStringLiteral("/librepods");
+        const QString dir = QFileInfo(statusFilePath()).path();
         if (!QDir().mkpath(dir)) {
             LOG_ERROR("Cannot create state directory: " << dir);
             return;
         }
-        QSaveFile file(dir + QStringLiteral("/status.json"));
+        QSaveFile file(statusFilePath());
         if (!file.open(QIODevice::WriteOnly)) {
             LOG_ERROR("Cannot open state file: " << file.fileName());
             return;
@@ -2486,6 +2484,8 @@ private:
 };
 
 int main(int argc, char *argv[]) {
+    // Everything the daemon creates (settings, status file, socket directory entries) is for the user alone.
+    umask(077);
     // Read before the application object exists, because --headless decides which class to construct.
     bool debugMode = false;
     bool hideOnStart = false;
@@ -2705,8 +2705,10 @@ int main(int argc, char *argv[]) {
 
     if (!server.listen(ipcPath))
     {
-        LOG_ERROR("Unable to start the listening server");
-        LOG_DEBUG("Server error: " << server.errorString());
+        LOG_ERROR("Unable to start the listening server: " << server.errorString());
+        // An absent state file is how a watcher learns the daemon stopped, and this also clears one an earlier run left.
+        QFile::remove(statusFilePath());
+        return 1;
     }
     else
     {
@@ -2839,8 +2841,7 @@ int main(int argc, char *argv[]) {
         }
         QLocalServer::removeServer(ipcPath);
         // An absent state file is how a watcher learns the daemon stopped.
-        QFile::remove(QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
-                      + QStringLiteral("/librepods/status.json"));
+        QFile::remove(statusFilePath());
     });
     // QApplication::exec sets the accessibility root, which QCoreApplication::exec does not.
     return headless ? QCoreApplication::exec() : QApplication::exec();

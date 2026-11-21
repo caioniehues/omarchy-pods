@@ -6,12 +6,53 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "ConnectionEvents.js" as ConnectionEvents
 
 Panel {
   id: root
   moduleName: "io.github.thisisgm.omapods"
   ipcTarget: "omapods"
   manageIpc: false
+
+  property var connectionEvents: ConnectionEvents.newState()
+
+  // The first widget shows the card, so a plugin on several bars opens one.
+  function ownsConnectionCard() {
+    if (!root.bar) return true
+    var widgets = root.bar.moduleWidgets(root.moduleName)
+    return widgets.length === 0 || widgets[0] === root
+  }
+
+  readonly property bool showCardOnOpen: setting("showConnectionCard", true) === true
+
+  // The card follows Omarchy's animations switch (Style.reduceMotion), read when it opens.
+  function showConnectionCard(demo) {
+    connectionCard.active = false
+    connectionCard.setSource("ConnectionCard.qml", { pods: pods, previewOnly: demo, animateModel: !Style.reduceMotion })
+    connectionCard.active = true
+  }
+
+  Loader {
+    id: connectionCard
+    active: false
+  }
+  Connections {
+    target: connectionCard.item
+    function onDismissed() { connectionCard.active = false }
+  }
+  Connections {
+    target: pods
+    function onStatusUpdated() {
+      if (ConnectionEvents.shouldShow(root.connectionEvents, pods.lidState, Date.now()) && root.ownsConnectionCard() && root.showCardOnOpen)
+        root.showConnectionCard(false)
+      // A demo has no AirPods behind it, so a status write must not close it.
+      if (!pods.connected && pods.lidState !== Model.LID_OPEN && !(connectionCard.item && connectionCard.item.previewOnly))
+        connectionCard.active = false
+    }
+    function onDaemonReachableChanged() {
+      if (!pods.daemonReachable) connectionCard.active = false
+    }
+  }
 
   property int cursorIndex: 0
   property bool cursorActive: false
@@ -133,6 +174,13 @@ Panel {
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { pods.refresh(); return "ok" }
+    // card and cardDemo are explicit commands, so the setting gates only the case-open trigger.
+    function card(): string {
+      if (!pods.hasAirPods && pods.lidState !== Model.LID_OPEN) return "Connect AirPods or open their case first"
+      root.showConnectionCard(false)
+      return "ok"
+    }
+    function cardDemo(): string { root.showConnectionCard(true); return "ok" }
     function noise(): string { pods.cycleNoiseMode(); return "ok" }
     function status(): string { return Model.noiseModeName(pods.noiseMode) }
   }

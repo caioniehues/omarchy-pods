@@ -19,3 +19,4 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
       - run: deno run --allow-read tests/model.test.js
+      - run: deno run --allow-read tests/connection-events.test.js

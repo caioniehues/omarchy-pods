@@ -4,125 +4,73 @@
 class TestLowBatteryWatcher : public QObject {
     Q_OBJECT
 
+    static int stageOf(const std::optional<LowBatteryAlert> &a) { return a ? a->stage : -1; }
+
 private slots:
-    void unavailableNeverTrips() {
-        LowBatteryLatch l;
-        QVERIFY(!l.evaluate(0, /*available=*/false, /*charging=*/false));
-        QVERIFY(!l.evaluate(5, false, false));
-        QVERIFY(!l.notified());
+    void alertsAt20Then10Then5() {
+        LowBatteryWatcher w;
+        QVERIFY(!w.evaluate(21, true, false));
+        const auto first = w.evaluate(20, true, false);
+        QCOMPARE(stageOf(first), 20);
+        QCOMPARE(int(first->level), 20);
+        const auto second = w.evaluate(10, true, false);
+        QCOMPARE(stageOf(second), 10);
+        QCOMPARE(int(second->level), 10);
+        const auto third = w.evaluate(4, true, false);
+        QCOMPARE(stageOf(third), 5);
+        QCOMPARE(int(third->level), 4);
+        QVERIFY(!w.evaluate(3, true, false));
     }
 
-    void chargingNeverTripsAndClearsLatch() {
-        LowBatteryLatch l;
-        // Trip first so the latch is set.
-        QCOMPARE(l.evaluate(5, true, false).value_or(quint8(0xff)), quint8(5));
-        QVERIFY(l.notified());
-        // Charging clears the latch but produces no notification.
-        QVERIFY(!l.evaluate(5, true, true));
-        QVERIFY(!l.notified());
+    void skipFrom22To8GivesOneAlertAtStage10AndMarks20Done() {
+        LowBatteryWatcher w;
+        QVERIFY(!w.evaluate(22, true, false));
+        const auto a = w.evaluate(8, true, false);
+        QCOMPARE(stageOf(a), 10);
+        QCOMPARE(int(a->level), 8);
+        // Stage 20 is done: a rise to 19 and back to 18 stays quiet.
+        QVERIFY(!w.evaluate(19, true, false));
+        QVERIFY(!w.evaluate(18, true, false));
+        QVERIFY(!w.evaluate(9, true, false));
     }
 
-    void aboveTriggerNeverFires() {
-        LowBatteryLatch l;
-        QVERIFY(!l.evaluate(11, true, false));
-        QVERIFY(!l.evaluate(50, true, false));
-        QVERIFY(!l.evaluate(100, true, false));
-        QVERIFY(!l.notified());
+    void firstReadingAlreadyDeepGivesOneAlert() {
+        LowBatteryWatcher w;
+        QCOMPARE(stageOf(w.evaluate(3, true, false)), 5);
+        QVERIFY(!w.evaluate(3, true, false));
     }
 
-    void firstCrossBelowTriggerFires() {
-        LowBatteryLatch l;
-        const auto r = l.evaluate(10, true, false);
-        QVERIFY(r.has_value());
-        QCOMPARE(r.value_or(quint8(0xff)), quint8(10));
-        QVERIFY(l.notified());
+    void hoveringAt19And20AlertsOnce() {
+        LowBatteryWatcher w;
+        QCOMPARE(stageOf(w.evaluate(19, true, false)), 20);
+        QVERIFY(!w.evaluate(20, true, false));
+        QVERIFY(!w.evaluate(19, true, false));
+        QVERIFY(!w.evaluate(20, true, false));
     }
 
-    void secondReadingBelowTriggerSuppressed() {
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(8, true, false));
-        QVERIFY(!l.evaluate(7, true, false));  // already latched
-        QVERIFY(!l.evaluate(5, true, false));
+    void reArmsAt25() {
+        LowBatteryWatcher w;
+        QVERIFY(w.evaluate(4, true, false));
+        QVERIFY(!w.evaluate(24, true, false));
+        QVERIFY(!w.evaluate(19, true, false));  // 24 did not re-arm
+        QVERIFY(!w.evaluate(25, true, false));
+        QCOMPARE(stageOf(w.evaluate(20, true, false)), 20);
     }
 
-    void recoveryToHysteresisRangeStillLatched() {
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(9, true, false));
-        // Between trigger (10) and reset (15): latch stays set, no
-        // notification. This is the hysteresis band.
-        QVERIFY(!l.evaluate(12, true, false));
-        QVERIFY(l.notified());
-        QVERIFY(!l.evaluate(14, true, false));
-        QVERIFY(l.notified());
+    void reArmsOnCharging() {
+        LowBatteryWatcher w;
+        QVERIFY(w.evaluate(7, true, false));
+        QVERIFY(!w.evaluate(7, true, true));  // charging alerts nothing
+        QCOMPARE(stageOf(w.evaluate(7, true, false)), 10);
     }
 
-    void recoveryToResetClearsLatchSilently() {
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(9, true, false));
-        QVERIFY(!l.evaluate(15, true, false));  // reset level: clears latch but no notify
-        QVERIFY(!l.notified());
-    }
-
-    void retripAfterRecovery() {
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(8, true, false));
-        QVERIFY(!l.evaluate(20, true, false));
-        QVERIFY(!l.notified());
-        // Discharge cycle: should fire again.
-        QCOMPARE(l.evaluate(8, true, false).value_or(quint8(0xff)), quint8(8));
-        QVERIFY(l.notified());
-    }
-
-    void retripAfterCharging() {
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(7, true, false));
-        QVERIFY(!l.evaluate(7, true, true));  // charging clears
-        QVERIFY(!l.notified());
-        // Unplug while still low: fires immediately.
-        QCOMPARE(l.evaluate(7, true, false).value_or(quint8(0xff)), quint8(7));
-    }
-
-    void boundariesExact() {
-        LowBatteryLatch l(/*trigger=*/10, /*reset=*/15);
-        // Exactly trigger -> trip.
-        QCOMPARE(l.evaluate(10, true, false).value_or(quint8(0xff)), quint8(10));
-        // Exactly reset -> clears latch silently.
-        QVERIFY(!l.evaluate(15, true, false));
-        QVERIFY(!l.notified());
-        // Just above trigger after reset -> no trip.
-        QVERIFY(!l.evaluate(11, true, false));
-    }
-
-    void customThresholds() {
-        LowBatteryLatch l(/*trigger=*/5, /*reset=*/20);
-        QCOMPARE(l.trigger(), quint8(5));
-        QCOMPARE(l.reset(), quint8(20));
-        QVERIFY(!l.evaluate(8, true, false));  // above the custom trigger
-        QCOMPARE(l.evaluate(5, true, false).value_or(quint8(0xff)), quint8(5));
-        QVERIFY(!l.evaluate(19, true, false));  // still latched in the wider band
-        QVERIFY(!l.evaluate(20, true, false));  // resets at custom reset
-        QVERIFY(!l.notified());
-    }
-
-    void resetLatchMethod() {
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(5, true, false));
-        QVERIFY(l.notified());
-        l.resetLatch();
-        QVERIFY(!l.notified());
-        // After manual reset, a still-low reading fires again.
-        QCOMPARE(l.evaluate(5, true, false).value_or(quint8(0xff)), quint8(5));
-    }
-
-    void unavailableDoesNotClearLatch() {
-        // Pod went out of range mid-low. Latch must persist so a
-        // brief signal blip doesn't unlock a duplicate toast on
-        // reconnect.
-        LowBatteryLatch l;
-        QVERIFY(l.evaluate(8, true, false));
-        QVERIFY(!l.evaluate(8, false, false));
-        QVERIFY(l.notified());
-        QVERIFY(!l.evaluate(8, true, false));  // still latched
+    void unavailableChangesNothing() {
+        LowBatteryWatcher w;
+        QVERIFY(!w.evaluate(0, false, false));  // no alert from a missing pod
+        QCOMPARE(stageOf(w.evaluate(8, true, false)), 10);
+        QVERIFY(!w.evaluate(30, false, false));  // does not re-arm
+        QVERIFY(!w.evaluate(8, false, true));    // charging flag ignored too
+        QVERIFY(!w.evaluate(8, true, false));
     }
 };
 
