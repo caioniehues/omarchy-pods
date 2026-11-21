@@ -14,7 +14,9 @@ Item {
   property bool animateModel: true
   property bool previewOnly: false
   signal dismissed()
-  readonly property int displayMs: animateModel ? 9800 : 5000
+  readonly property int holdMs: 1300
+  readonly property int staticDisplayMs: 5000
+  readonly property int displayMs: animateModel ? animationEnd + holdMs : staticDisplayMs
   readonly property int transitionMs: animateModel ? Style.duration(250) : 0
   readonly property bool showProModel: previewOnly || (pods && pods.isProSeries === true)
   readonly property int animationEnd: 8500
