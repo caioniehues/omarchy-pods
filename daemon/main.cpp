@@ -61,6 +61,12 @@ using namespace AirpodsTrayApp::Enums;
 // Users filter via QT_LOGGING_RULES with `openpods.*`.
 Q_LOGGING_CATEGORY(openpods, "openpods")
 
+static QString statusFilePath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
+        + QStringLiteral("/librepods/status.json");
+}
+
 class AirPodsTrayApp : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool airpodsConnected READ areAirpodsConnected NOTIFY airPodsStatusChanged)
@@ -2442,13 +2448,12 @@ public:
         if (line == m_lastState) {
             return;
         }
-        const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
-            + QStringLiteral("/librepods");
+        const QString dir = QFileInfo(statusFilePath()).path();
         if (!QDir().mkpath(dir)) {
             LOG_ERROR("Cannot create state directory: " << dir);
             return;
         }
-        QSaveFile file(dir + QStringLiteral("/status.json"));
+        QSaveFile file(statusFilePath());
         if (!file.open(QIODevice::WriteOnly)) {
             LOG_ERROR("Cannot open state file: " << file.fileName());
             return;
@@ -2702,8 +2707,7 @@ int main(int argc, char *argv[]) {
     {
         LOG_ERROR("Unable to start the listening server: " << server.errorString());
         // An absent state file is how a watcher learns the daemon stopped, and this also clears one an earlier run left.
-        QFile::remove(QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
-                      + QStringLiteral("/librepods/status.json"));
+        QFile::remove(statusFilePath());
         return 1;
     }
     else
@@ -2837,8 +2841,7 @@ int main(int argc, char *argv[]) {
         }
         QLocalServer::removeServer(ipcPath);
         // An absent state file is how a watcher learns the daemon stopped.
-        QFile::remove(QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation)
-                      + QStringLiteral("/librepods/status.json"));
+        QFile::remove(statusFilePath());
     });
     // QApplication::exec sets the accessibility root, which QCoreApplication::exec does not.
     return headless ? QCoreApplication::exec() : QApplication::exec();
