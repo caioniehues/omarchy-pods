@@ -204,6 +204,7 @@ Item {
             }
             Loader3D {
               id: modelLoader
+              active: root.showProModel
               source: "assets/airpods/Air_pods_pro_animated.qml"
               y: -0.6
               onLoaded: {
