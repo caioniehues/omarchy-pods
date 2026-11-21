@@ -1,34 +1,36 @@
 const source = Deno.readTextFileSync(new URL('../ConnectionEvents.js', import.meta.url))
-const { newState, shouldShow } = new Function(source + '; return { newState, shouldShow }')()
-function check(name, value, expected) { if (value !== expected) throw new Error(name) }
+const { newState, shouldShow, LID_OPEN, LID_CLOSED, LID_UNKNOWN, CARD_COOLDOWN_MS } =
+  new Function(source + '; return { newState, shouldShow, LID_OPEN, LID_CLOSED, LID_UNKNOWN, CARD_COOLDOWN_MS }')()
+function check(name, value, expected) { if (value !== expected) throw new Error(`${name}: got ${value}, expected ${expected}`) }
+
+// The connected flag is not an input: it flips on wake, recovery and restart.
+check('shouldShow takes state, lid state and time only', shouldShow.length, 3)
+
 let state = newState()
-check('shell reload while connected is quiet', shouldShow(state, true, 2, 0), false)
-check('battery updates are quiet', shouldShow(state, true, 2, 100), false)
-check('disconnect is quiet', shouldShow(state, false, 2, 200), false)
-check('connection displays once', shouldShow(state, true, 2, 300), true)
-check('repeated status is quiet', shouldShow(state, true, 2, 400), false)
-shouldShow(state, false, 2, 500)
-check('short control recovery is quiet', shouldShow(state, true, 2, 600), false)
-shouldShow(state, false, 2, 16000)
-check('later connection displays', shouldShow(state, true, 2, 17000), true)
+check('first observation, open, never shows', shouldShow(state, LID_OPEN, 0), false)
 
 state = newState()
-check('startup disconnected is quiet', shouldShow(state, false, 2, 0), false)
-check('first real connection displays', shouldShow(state, true, 2, 1), true)
+check('first observation, closed, never shows', shouldShow(state, LID_CLOSED, 0), false)
+check('closed to open shows', shouldShow(state, LID_OPEN, 100), true)
+check('open to open does not show', shouldShow(state, LID_OPEN, 200), false)
 
 state = newState()
-check('shell reload with an open lid is quiet', shouldShow(state, false, 0, 0), false)
-check('repeated open advertisements are quiet', shouldShow(state, false, 0, 100), false)
-check('closing the lid is quiet', shouldShow(state, false, 1, 200), false)
-check('closed to open displays once', shouldShow(state, false, 0, 300), true)
-check('another open advertisement is quiet', shouldShow(state, false, 0, 400), false)
-check('audio connection after opening is deduplicated', shouldShow(state, true, 0, 500), false)
+check('unknown first observation is quiet', shouldShow(state, LID_UNKNOWN, 0), false)
+check('unknown to open does not show', shouldShow(state, LID_OPEN, 100), false)
 
 state = newState()
-check('unknown to open is not proof of an opening', shouldShow(state, false, 2, 0), false)
-check('unknown lid remains quiet', shouldShow(state, false, 0, 100), false)
-check('known closed lid remains quiet', shouldShow(state, false, 1, 200), false)
-check('later known opening displays', shouldShow(state, false, 0, 300), true)
-shouldShow(state, false, 1, 16000)
-check('opening after the cooldown displays again', shouldShow(state, false, 0, 17000), true)
+shouldShow(state, LID_CLOSED, 0)
+check('closed to unknown is quiet', shouldShow(state, LID_UNKNOWN, 100), false)
+check('unknown to open after closed does not show', shouldShow(state, LID_OPEN, 200), false)
+
+state = newState()
+shouldShow(state, LID_CLOSED, 0)
+check('first opening shows', shouldShow(state, LID_OPEN, 1000), true)
+shouldShow(state, LID_CLOSED, 2000)
+check('second opening within the cooldown does not show', shouldShow(state, LID_OPEN, 1000 + CARD_COOLDOWN_MS - 1), false)
+shouldShow(state, LID_CLOSED, 1000 + CARD_COOLDOWN_MS)
+check('an opening after the cooldown shows', shouldShow(state, LID_OPEN, 1000 + 2 * CARD_COOLDOWN_MS), true)
+
+state = newState()
+for (let t = 0; t < 5; t++) check('status updates with no lid change never show', shouldShow(state, LID_UNKNOWN, t * 1000), false)
 console.log('connection-events.test.js: all checks passed')

@@ -4,17 +4,14 @@ var LID_UNKNOWN = 2
 var CARD_COOLDOWN_MS = 15000
 
 function newState() {
-  return { initialized: false, connected: false, lidState: LID_UNKNOWN, shownAt: null }
+  return { lidState: LID_UNKNOWN, shownAt: null }
 }
 
-function shouldShow(state, connected, lidState, now) {
-  var established = state.initialized && !state.connected && connected
-  var opened = state.initialized && state.lidState === LID_CLOSED && lidState === LID_OPEN
-  state.initialized = true
-  state.connected = connected
+// The connected flag is not an input: it flips on wake, recovery and restart, which are not the case opening.
+function shouldShow(state, lidState, now) {
+  var opened = state.lidState === LID_CLOSED && lidState === LID_OPEN
   state.lidState = lidState
-  if ((!established && !opened)
-      || (state.shownAt !== null && now - state.shownAt < CARD_COOLDOWN_MS)) return false
+  if (!opened || (state.shownAt !== null && now - state.shownAt < CARD_COOLDOWN_MS)) return false
   state.shownAt = now
   return true
 }
