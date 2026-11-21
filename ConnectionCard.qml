@@ -13,14 +13,11 @@ Item {
   property var pods: null
   property bool animateModel: true
   property bool previewOnly: false
-  property string previewModel: "pro"
   signal dismissed()
   readonly property int displayMs: animateModel ? 9800 : 5000
   readonly property int transitionMs: animateModel ? 250 : 0
-  readonly property bool showMaxModel: previewOnly ? previewModel === "max" : pods && pods.isHeadset
-  readonly property bool showProModel: previewOnly ? previewModel !== "max" : pods && pods.isProSeries
-  readonly property bool showThreeDimensionalModel: showMaxModel || showProModel
-  readonly property int animationEnd: showMaxModel ? 7800 : 8500
+  readonly property bool showProModel: previewOnly || (pods && pods.isProSeries === true)
+  readonly property int animationEnd: 8500
   readonly property int lowBatteryPercent: 20
 
   readonly property var targetScreen: Quickshell.screens.find(screen =>
@@ -156,8 +153,7 @@ Item {
         Text {
           Layout.fillWidth: true
           Layout.rightMargin: Style.space(16)
-          text: root.previewOnly
-            ? (root.showMaxModel ? "AirPods Max · preview" : "AirPods Pro · preview")
+          text: root.previewOnly ? "AirPods Pro · preview"
             : root.pods && root.pods.deviceName ? root.pods.deviceName : "AirPods"
           textFormat: Text.PlainText
           color: Color.popups.text
@@ -183,33 +179,31 @@ Item {
           Layout.fillHeight: true
           View3D {
             anchors.fill: parent
-            visible: root.showThreeDimensionalModel
+            visible: root.showProModel
             environment: SceneEnvironment {
               backgroundMode: SceneEnvironment.Transparent
               antialiasingMode: SceneEnvironment.MSAA
               antialiasingQuality: SceneEnvironment.High
               lightProbe: Texture { source: "assets/airpods/studio.hdr" }
-              probeExposure: root.showMaxModel ? 1.25 : 0.8
+              probeExposure: 0.8
               tonemapMode: SceneEnvironment.TonemapModeAces
             }
             PerspectiveCamera {
-              position: Qt.vector3d(0, root.showMaxModel ? 1.8 : 1.3, root.showMaxModel ? 34 : 15)
-              eulerRotation.x: root.showMaxModel ? 0 : -4
+              position: Qt.vector3d(0, 1.3, 15)
+              eulerRotation.x: -4
               clipNear: 0.1
               clipFar: 100
               fieldOfView: 36
             }
             DirectionalLight {
               eulerRotation: Qt.vector3d(-30, -30, 0)
-              brightness: root.showMaxModel ? 1.8 : 1
-              ambientColor: root.showMaxModel ? "#999999" : "#555555"
+              brightness: 1
+              ambientColor: "#555555"
             }
             Loader3D {
               id: modelLoader
-              source: root.showMaxModel
-                ? "assets/airpods-max/Air_pods_max_animated.qml"
-                : "assets/airpods/Air_pods_pro_animated.qml"
-              y: root.showMaxModel ? -1.4 : -0.6
+              source: "assets/airpods/Air_pods_pro_animated.qml"
+              y: -0.6
               onLoaded: {
                 item.animationFrame = root.animateModel ? 0 : root.animationEnd
                 if (root.animateModel) modelAnimation.start()
@@ -226,8 +220,7 @@ Item {
           }
           AirPodsIcon {
             anchors.centerIn: parent
-            visible: !root.showThreeDimensionalModel
-            variant: root.pods && root.pods.isHeadset ? "max" : "buds"
+            visible: !root.showProModel
             iconSize: Style.space(100)
             color: Color.popups.text
           }
@@ -238,7 +231,7 @@ Item {
           Layout.fillWidth: true
           spacing: Style.space(14)
           Repeater {
-            model: root.showMaxModel ? ["headset"] : ["left", "right", "case"]
+            model: ["left", "right", "case"]
             BatteryRing {
               required property string modelData
               Layout.fillWidth: true
@@ -246,9 +239,8 @@ Item {
                 : !root.pods ? ({ level: Model.LEVEL_UNKNOWN, charging: false })
                 : modelData === "left" ? root.pods.leftPod
                 : modelData === "right" ? root.pods.rightPod
-                : modelData === "headset" ? root.pods.headsetBattery : root.pods.caseBattery
-              label: modelData === "left" ? "Left" : modelData === "right" ? "Right"
-                : modelData === "headset" ? "Headset" : "Case"
+                : root.pods.caseBattery
+              label: modelData === "left" ? "Left" : modelData === "right" ? "Right" : "Case"
             }
           }
         }
