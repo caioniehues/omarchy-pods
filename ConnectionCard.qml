@@ -255,12 +255,6 @@ Item {
         text: "×"
         color: Color.popups.text
         font.pixelSize: Style.font.heading
-        MouseArea {
-          anchors.fill: parent
-          anchors.margins: -Style.space(6)
-          cursorShape: Qt.PointingHandCursor
-          onClicked: root.close()
-        }
       }
     }
   }
