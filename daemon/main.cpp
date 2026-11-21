@@ -1,4 +1,5 @@
 #include <QSettings>
+#include <sys/stat.h>
 #include <QLocalServer>
 #include <QSaveFile>
 #include <QFileInfo>
@@ -2486,6 +2487,8 @@ private:
 };
 
 int main(int argc, char *argv[]) {
+    // Everything the daemon creates (settings, status file, socket directory entries) is for the user alone.
+    umask(077);
     // Read before the application object exists, because --headless decides which class to construct.
     bool debugMode = false;
     bool hideOnStart = false;
