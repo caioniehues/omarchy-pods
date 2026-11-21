@@ -3,47 +3,31 @@
 #include <QtGlobal>
 #include <optional>
 
-// Stateful low-battery latch for a single battery source (one pod or
-// the case). Asymmetric hysteresis prevents repeated notifications
-// when a source hovers near the threshold on noisy battery readings:
-// trips once at level <= triggerLevel, clears the latch only when
-// level rises back to >= resetLevel. Charging clears the latch
-// immediately so a brief plug-pull near the threshold doesn't
-// lock out future warnings.
-//
-// evaluate() returns the source's level percent when a notification
-// SHOULD fire this update, or std::nullopt when no transition
-// occurred. Callers format the user-visible message — the latch
-// only owns the trip state.
-class LowBatteryLatch {
-public:
-    constexpr explicit LowBatteryLatch(quint8 trigger = 10, quint8 reset = 15)
-        : m_trigger(trigger), m_reset(reset) {}
+struct LowBatteryAlert {
+    quint8 stage;  // the stage crossed: 20, 10 or 5
+    quint8 level;  // the reading that crossed it
+};
 
-    std::optional<quint8> evaluate(quint8 level, bool available, bool charging) {
+// Staged low-battery alerts for one source (a pod or the case).
+class LowBatteryWatcher {
+public:
+    static constexpr quint8 stages[] = {20, 10, 5};
+    static constexpr quint8 rearmLevel = 25;
+
+    // A reading that crosses several stages yields one alert, for the deepest.
+    std::optional<LowBatteryAlert> evaluate(quint8 level, bool available, bool charging) {
         if (!available) return std::nullopt;
-        if (charging) {
-            m_notified = false;
+        if (charging || level >= rearmLevel) {
+            m_stagesDone = 0;
             return std::nullopt;
         }
-        if (level <= m_trigger && !m_notified) {
-            m_notified = true;
-            return level;
-        }
-        if (level >= m_reset) {
-            m_notified = false;
-        }
-        return std::nullopt;
+        int crossed = 0;
+        while (crossed < 3 && level <= stages[crossed]) ++crossed;
+        if (crossed <= m_stagesDone) return std::nullopt;
+        m_stagesDone = crossed;
+        return LowBatteryAlert{stages[crossed - 1], level};
     }
 
-    bool notified() const { return m_notified; }
-    quint8 trigger() const { return m_trigger; }
-    quint8 reset() const { return m_reset; }
-
-    void resetLatch() { m_notified = false; }
-
 private:
-    quint8 m_trigger;
-    quint8 m_reset;
-    bool m_notified = false;
+    int m_stagesDone = 0;
 };

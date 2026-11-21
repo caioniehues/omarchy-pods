@@ -984,9 +984,8 @@ public slots:
         setNoiseControlMode(static_cast<NoiseControlMode>(mode));
     }
 
-    // Walk every battery source on each battery-status change and
-    // delegate the trip/reset decision to its LowBatteryLatch. Format
-    // + emit the user-visible toast here; the latch owns no UI. The
+    // Walk every battery source on each battery-status change and let
+    // its LowBatteryWatcher decide; format and emit the toast here. The
     // global notificationsEnabled setting still gates emission via
     // Notifier::notify.
     void checkLowBatteryThresholds()
@@ -1000,24 +999,24 @@ public slots:
             quint8 level;
             bool available;
             bool charging;
-            LowBatteryLatch *latch;
+            LowBatteryWatcher *watcher;
         };
         const Source sources[] = {
             { "Left",  b->getLeftPodLevel(),  b->isLeftPodAvailable(),
-              b->isLeftPodCharging(),  &m_lowBatteryLatchLeft },
+              b->isLeftPodCharging(),  &m_lowBatteryWatcherLeft },
             { "Right", b->getRightPodLevel(), b->isRightPodAvailable(),
-              b->isRightPodCharging(), &m_lowBatteryLatchRight },
+              b->isRightPodCharging(), &m_lowBatteryWatcherRight },
             { "Case",  b->getCaseLevel(),     b->isCaseAvailable(),
-              b->isCaseCharging(),     &m_lowBatteryLatchCase },
+              b->isCaseCharging(),     &m_lowBatteryWatcherCase },
         };
 
         for (const Source &s : sources)
         {
-            const auto fire = s.latch->evaluate(s.level, s.available, s.charging);
-            if (fire) {
+            const auto alert = s.watcher->evaluate(s.level, s.available, s.charging);
+            if (alert) {
                 m_notifier->notify(
                     tr("%1 AirPod Low Battery").arg(QString::fromLatin1(s.label)),
-                    tr("%1% remaining").arg(*fire));
+                    tr("%1% remaining").arg(alert->level));
             }
         }
     }
@@ -2326,14 +2325,10 @@ private:
     int m_oneBudANCChangesTotal = 0;
     int m_reopenCallsTotal = 0;
 
-    // Low-battery notification latches per battery source. State +
-    // hysteresis live in LowBatteryLatch (see lowbatterywatcher.hpp);
-    // tst_lowbatterywatcher.cpp exhaustively covers the trip/reset
-    // transitions so this slot only needs to feed the three sources
-    // through their respective latches and format the message.
-    LowBatteryLatch m_lowBatteryLatchLeft;
-    LowBatteryLatch m_lowBatteryLatchRight;
-    LowBatteryLatch m_lowBatteryLatchCase;
+    // One staged watcher per battery source; see lowbatterywatcher.hpp.
+    LowBatteryWatcher m_lowBatteryWatcherLeft;
+    LowBatteryWatcher m_lowBatteryWatcherRight;
+    LowBatteryWatcher m_lowBatteryWatcherCase;
 
 public:
     int reconnectAttemptsTotal() const { return m_reconnectAttemptsTotal; }
