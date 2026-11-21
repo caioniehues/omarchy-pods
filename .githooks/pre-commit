@@ -21,4 +21,7 @@ fi
 if printf '%s\n' "$staged" | rg -q '^(Model\.js|tests/)'; then
   out=$(npx -y deno run --allow-read tests/model.test.js 2>&1) || fail "$(printf 'tests/model.test.js failed:\n%s' "$out")"
 fi
+if printf '%s\n' "$staged" | rg -q '^(ConnectionEvents\.js|tests/)'; then
+  out=$(npx -y deno run --allow-read tests/connection-events.test.js 2>&1) || fail "$(printf 'tests/connection-events.test.js failed:\n%s' "$out")"
+fi
 exit 0
